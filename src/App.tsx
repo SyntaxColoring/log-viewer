@@ -1,34 +1,49 @@
 import React from 'react';
-import logo from './logo.svg';
 import './App.css';
-import { start } from 'repl';
+import { LogIndex, buildIndex, getEntry } from './logAccess'
+import { FixedSizeList } from 'react-window'
 
-async function buildIndex(file: File): Promise<number[]> {
-  console.log(`Reading ${file.size/1024/1024} MiB.`);
-  const stream = file.stream()
-  const reader = stream.getReader()
-  const startIndices: number[] = []
-  let readSoFar = 0
-  while (true) {
-    const chunk = await reader.read()
-    if (chunk.done) {
-      break
+
+function Row(
+  {index, style, data }: {
+    index: number,
+    style: object,
+    data: {
+      file: File,
+      logIndex: LogIndex,
     }
-    else {
-      for (let index = 0; index < chunk.value.length; index++) {
-        if (chunk.value[index] == 10) { // 10 is \n
-          const overallIndex = readSoFar + index
-          startIndices.push(overallIndex)
-        }
-      }
-      readSoFar += chunk.value.length
-    }
-    // TODO: We do need to yield to the event loop periodically,
-    // but there's probably a better way of doing this. WebWorker?
-    await new Promise((resolve) => { setTimeout(resolve, 0) })
   }
-  console.log("Done.")
-  return startIndices
+): JSX.Element {
+  const [text, setText] = React.useState("Loading...")
+  const {file, logIndex} = data
+  React.useEffect(() => {
+    let ignore = false
+    getEntry(file, logIndex, index).then((entry: any) => {
+      if (!ignore) setText(entry.MESSAGE || "<error>")
+    })
+    return () => { ignore = true }
+    // TODO: Rate-limit this somehow so we don't consume unbounded memory
+    // if the user scrolls really fast?
+  }, [index, file, logIndex])
+
+  return (
+    <div style={style}>{index}: {text}</div>
+  )
+}
+
+
+function LogList({file, logIndex}: {file: File, logIndex: LogIndex}): JSX.Element {
+  return (
+    <FixedSizeList
+      height={1000}
+      itemCount={logIndex.entryCount}
+      itemSize={35}
+      width={1000}
+      itemData={{file: file, logIndex: logIndex}}
+    >
+      {Row}
+    </FixedSizeList>
+  )
 }
 
 function Form(): JSX.Element {
@@ -36,9 +51,9 @@ function Form(): JSX.Element {
   // https://react.dev/learn/you-might-not-need-an-effect#chains-of-computations
 
   const [file, setFile] = React.useState(null as File | null)
-  const [index, setIndex] = React.useState(null as number[] | null)
+  const [index, setIndex] = React.useState(null as LogIndex | null)
   const [entryNumber, setEntryNumber] = React.useState(0)
-  const [text, setText] = React.useState(null as string | null)
+  const [entry, setEntry] = React.useState(null as object | null)
 
   React.useEffect(() => {
     let ignore = false
@@ -54,15 +69,13 @@ function Form(): JSX.Element {
   React.useEffect(
     () => {
       let ignore = false
-      setText(null)
+      setEntry(null)
       if (file && index) {
-        const startByte = index[Math.min(entryNumber, index.length-1)]
-        const endByte = index[Math.min(entryNumber+1, index.length-1)] // TODO: EOF handling isn't quite right here.
-        const slice = file.slice(startByte, endByte)
-        if (endByte-startByte > 10000) debugger
-        slice.text().then((text) => {
-          if (!ignore) setText(text)
-        })
+        if (0 <= entryNumber && entryNumber < index.entryCount) {
+          getEntry(file, index, entryNumber).then((entry) => {
+            if (!ignore) setEntry(entry)
+          })
+        }
       }
       return () => { ignore = true }
     },
@@ -72,22 +85,15 @@ function Form(): JSX.Element {
   function handleFileChange(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files ? event.target.files[0] : null
     setFile(file)
-    if (file) {
-      buildIndex(file).then((index) => setIndex(index))
-    }
-    else {
-      setIndex(null)
-    }
   }
 
   function handleEntryNumberChange(event: React.ChangeEvent<HTMLInputElement>) {
-    let parsed = parseInt(event.target.value) || 0
-    if (parsed < 0) parsed = 0
-    setEntryNumber(parsed)
+    setEntryNumber(parseInt(event.target.value))
   }
 
   return (
     <div>
+      { file && index ? (<LogList file={file} logIndex={index}></LogList>) : null}
       <label htmlFor="file">Log file (from <code>journalctl --output=json</code>)</label>
       <input id="file" type="file" onChange={handleFileChange}></input>
 
@@ -95,10 +101,14 @@ function Form(): JSX.Element {
       <input id="entryNumber" type="number" onChange={handleEntryNumberChange}></input>
 
       {file && (index == null) ? <p>Indexing...</p> : null}
-      <p>{text}</p>
+      <pre>
+        {JSON.stringify(entry, null, 2)}
+      </pre>
     </div>
   )
 }
+
+
 
 function Stopwatch() {
   const [startTime, _] = React.useState(Date.now())
