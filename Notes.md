@@ -24,3 +24,28 @@ Sort by anything other than wall clock time or entry number
 - Optimize index by making it an int32 array--a log will probably not have more than 4 billion records.
 - Figure out displaying many records, virtualization/bigtables
 - Figure out indexing, filtering, sorting
+
+
+
+# Rough priorities
+
+- Adequate typography
+- Render datetimes as datetimes (in the local timezone?)
+- Priority colors
+- Searching
+
+- Show full log details in sidebar
+
+- Filtering, e.g. by message or date
+
+- Native format imports
+- Better validation
+
+- Linting
+
+- Column reordering (drag and drop)
+- Customize extra and hidden columns
+
+- Re-exporting
+
+- Reboot markers
