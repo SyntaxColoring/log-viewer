@@ -33,6 +33,7 @@ export async function buildIndex(
 
     // TODO: We do need to yield to the event loop periodically,
     // but there's probably a better way of doing this. WebWorker?
+    await new Promise((resolve) => { setTimeout(resolve, 0) })
     onProgress(bytesReadSoFar / file.size)
   }
 
