@@ -3,23 +3,12 @@ export interface LogIndex {
   readonly getByteRange: (index: number) => [number, number]
 }
 
-
 export interface LogEntry {
   readonly timestamp: Date
   readonly priority: number
   readonly unit: string
   readonly syslogIdentifier: string
   readonly message: string
-}
-
-async function* chunks(file: File) {
-  // It seems like we shouldn't need this function--we should be able to
-  // just do a for-await iteration over file.stream() directly--but I can't get
-  // TypeScript to accept that.
-  const reader = file.stream().getReader()
-  for (let chunk = await reader.read(); !chunk.done; chunk = await reader.read()) {
-    yield chunk
-  }
 }
 
 export async function buildIndex(file: File): Promise<LogIndex> {
@@ -58,7 +47,7 @@ export async function buildIndex(file: File): Promise<LogIndex> {
     getByteRange: (index: number): [number, number] => {
       if (0 <= index && index < startIndices.length) {
         const startByte = startIndices[index]
-        const endByte = index+1 < startIndices.length ? startIndices[index+1] : file.size
+        const endByte = index + 1 < startIndices.length ? startIndices[index + 1] : file.size
         return [startByte, endByte]
       }
       else {
@@ -68,11 +57,10 @@ export async function buildIndex(file: File): Promise<LogIndex> {
   }
 }
 
-
 export async function getEntry(file: File, logIndex: LogIndex, entryNumber: number): Promise<LogEntry> {
   const [startByte, endByte] = logIndex.getByteRange(entryNumber)
   const byteLength = endByte - startByte
-  if (byteLength > 32*1024) console.warn(`Log entry ${entryNumber} is ${byteLength} bytes large.`)
+  if (byteLength > 32 * 1024) console.warn(`Log entry ${entryNumber} is ${byteLength} bytes large.`)
   const slice = file.slice(startByte, endByte)
   const text = await slice.text()
   // TODO: We should probably validate this. The input file is untrusted.
@@ -85,5 +73,15 @@ export async function getEntry(file: File, logIndex: LogIndex, entryNumber: numb
     unit: parsed["_SYSTEMD_UNIT"], // TODO: Also support _SYSTEMD_USER_UNIT?
     syslogIdentifier: parsed["SYSLOG_IDENTIFIER"],
     message: parsed["MESSAGE"]
+  }
+}
+
+async function* chunks(file: File) {
+  // It seems like we shouldn't need this function--we should be able to
+  // just do a for-await iteration over file.stream() directly--but I can't get
+  // TypeScript to accept that.
+  const reader = file.stream().getReader()
+  for (let chunk = await reader.read(); !chunk.done; chunk = await reader.read()) {
+    yield chunk
   }
 }
