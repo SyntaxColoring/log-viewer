@@ -11,7 +11,10 @@ export interface LogEntry {
   readonly message: string
 }
 
-export async function buildIndex(file: File): Promise<LogIndex> {
+export async function buildIndex(
+  file: File,
+  onProgress: (number: number) => void
+): Promise<LogIndex> {
   console.log(`Reading ${file.size} bytes...`);
 
   const newlineIndices: number[] = []
@@ -30,7 +33,7 @@ export async function buildIndex(file: File): Promise<LogIndex> {
 
     // TODO: We do need to yield to the event loop periodically,
     // but there's probably a better way of doing this. WebWorker?
-    await new Promise((resolve) => { setTimeout(resolve, 0) })
+    onProgress(bytesReadSoFar / file.size)
   }
 
   const hasTrailingNewline = (

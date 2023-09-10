@@ -55,20 +55,33 @@ function Row({
 }
 
 function LogView({ file }: { file: File | null }): JSX.Element {
-  const [index, setIndex] = React.useState(null as LogIndex | null)
+  type State = { status: "indexed", index: LogIndex } | { status: "indexing", progress: number }
+  const initialState: State = { status: "indexing", progress: 0 }
+  const [state, setState] = React.useState<State>(initialState)
+
   React.useEffect(() => {
     let ignore = false
-    setIndex(null)
+    setState(initialState)
+
+    const handleProgress = (progress: number) => {
+      if (!ignore) setState({status: "indexing", progress})
+    }
+
     if (file) {
-      buildIndex(file).then((index) => {
-        if (!ignore) setIndex(index)
+      buildIndex(file, handleProgress).then((index) => {
+        if (!ignore) setState({status: "indexed", index})
       })
     }
     return () => { ignore = true }
   }, [file])
 
   if (!file) return <></>
-  else if (!index) return <p>Loading...</p>
+  else if (state.status != "indexed") {
+    return <>
+      <p>Loading...</p>
+      <meter value={state.progress}></meter>
+    </>
+  }
   else {
     return (
       <TableVirtuoso
@@ -83,8 +96,8 @@ function LogView({ file }: { file: File | null }): JSX.Element {
           </tr>
         )}
         style={{ height: '100%', width: "100%" }}
-        totalCount={index.entryCount}
-        itemContent={(entryNumber) => <Row index={entryNumber} file={file} logIndex={index} />}
+        totalCount={state.index.entryCount}
+        itemContent={(entryNumber) => <Row index={entryNumber} file={file} logIndex={state.index} />}
       />
     )
   }
