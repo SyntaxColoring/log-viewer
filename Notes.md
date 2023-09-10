@@ -26,12 +26,18 @@ Sort by anything other than wall clock time or entry number
 - Figure out indexing, filtering, sorting
 
 
+Simplify list virtualization by precomputing each message's line count? Then each list item's size can be defined up-front and passed to our virtualization library.
+
+
 
 # Rough priorities
 
-- Adequate typography
+- Fetching the last element throws an error. Probably an off-by-one error somewhere.
+
+- Test if we actually need virtualization.
+    - It would be good if we could avoid all the complexity of reinventing find/replace, reinventing layout/reflow, reinventing viewport culling...
+
 - Render datetimes as datetimes (in the local timezone?)
-- Priority colors
 - Searching
 
 - Show full log details in sidebar
@@ -49,3 +55,14 @@ Sort by anything other than wall clock time or entry number
 - Re-exporting
 
 - Reboot markers
+
+- "X hours ago" tooltips on dates
+- Adjustable timezones
+
+- Fix horizontal scrolling somehow
+    - Scrollbar too dynamic as virtualized cells go in and out of view
+        - Expand window?
+        - Precompute max scroll size?
+    - Very long horizontal scrolling may not be what people actually want, e.g. for log lines that are long English text
+        - Global text wrap toggle?
+            - How do we calculate the element heights then? Implement a reflow algorithm in JS?

@@ -4,6 +4,14 @@ export interface LogIndex {
 }
 
 
+export interface LogEntry {
+  readonly timestamp: Date
+  readonly priority: number
+  readonly unit: string
+  readonly syslogIdentifier: string
+  readonly message: string
+}
+
 export async function buildIndex(file: File): Promise<LogIndex> {
   console.log(`Reading ${file.size} bytes...`);
 
@@ -51,12 +59,21 @@ export async function buildIndex(file: File): Promise<LogIndex> {
 }
 
 
-// TODO: Is returning Promise<object> correct here?
-export async function getEntry(file: File, logIndex: LogIndex, entryNumber: number): Promise<object> {
+export async function getEntry(file: File, logIndex: LogIndex, entryNumber: number): Promise<LogEntry> {
   const [startByte, endByte] = logIndex.getByteRange(entryNumber)
-  if (endByte-startByte > 10000) debugger
+  const byteLength = endByte - startByte
+  if (byteLength > 32*1024) console.warn(`Log entry ${entryNumber} is ${byteLength} bytes large.`)
   const slice = file.slice(startByte, endByte)
   const text = await slice.text()
-  // TODO: Should we return a Map instead?
-  return JSON.parse(text)
+  // TODO: We should probably validate this. The input file is untrusted.
+  const parsed = JSON.parse(text)
+
+  const epochMicroseconds = parseInt(parsed["__REALTIME_TIMESTAMP"])
+  return {
+    timestamp: new Date(epochMicroseconds / 1000),
+    priority: parseInt(parsed["PRIORITY"]),
+    unit: parsed["_SYSTEMD_UNIT"], // TODO: Also support _SYSTEMD_USER_UNIT?
+    syslogIdentifier: parsed["SYSLOG_IDENTIFIER"],
+    message: parsed["MESSAGE"]
+  }
 }

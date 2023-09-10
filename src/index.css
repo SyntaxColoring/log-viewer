@@ -1,3 +1,56 @@
+html, body, #root {
+  /* Make the root elements fill the whole screen so the table can fill
+  the whole root elements. */
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+#root {
+  display: flex;
+  flex-direction: column;
+}
+
+table {
+  /* Fill up all available vertical space. */
+  flex-grow: 1;
+
+  /* Use a fixed table layout because otherwise the width of columns
+  would vary as you scroll up and down. */
+  table-layout: fixed;
+  width: 100%;
+}
+
 label {
-  display: block
+  display: block;
+}
+
+td {
+  vertical-align: baseline;
+  border-bottom: 1px solid #aaa
+}
+
+td {
+  overflow-x: auto;
+}
+
+pre {
+  /* Default is 8 on Chrome, which is a bit excessive. */
+  tab-size: 4;
+}
+
+.log-debug {
+  color: #666
+}
+
+.log-info, .log-notice {
+  /* Use the default styling. */
+}
+
+.log-warning {
+  background-color: #f2c75c;
+}
+
+.log-err, .log-crit, .log-alert, .log-emerg {
+  background: #d3273e;
 }
