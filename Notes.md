@@ -32,8 +32,6 @@ Simplify list virtualization by precomputing each message's line count? Then eac
 
 # Rough priorities
 
-- Fetching the last element throws an error. Probably an off-by-one error somewhere.
-
 - Test if we actually need virtualization.
     - It would be good if we could avoid all the complexity of reinventing find/replace, reinventing layout/reflow, reinventing viewport culling...
 

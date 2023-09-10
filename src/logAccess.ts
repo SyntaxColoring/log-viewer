@@ -12,47 +12,57 @@ export interface LogEntry {
   readonly message: string
 }
 
+async function* chunks(file: File) {
+  // It seems like we shouldn't need this function--we should be able to
+  // just do a for-await iteration over file.stream() directly--but I can't get
+  // TypeScript to accept that.
+  const reader = file.stream().getReader()
+  for (let chunk = await reader.read(); !chunk.done; chunk = await reader.read()) {
+    yield chunk
+  }
+}
+
 export async function buildIndex(file: File): Promise<LogIndex> {
   console.log(`Reading ${file.size} bytes...`);
 
-  const stream = file.stream()
-  const reader = stream.getReader()
-  const startBytes: number[] = []
+  const newlineIndices: number[] = []
   let bytesReadSoFar = 0
   let chunkCount = 0
 
-  while (true) {
-    const chunk = await reader.read()
-    if (chunk.done) {
-      break
-    }
-    else {
-      for (let index = 0; index < chunk.value.length; index++) {
-        if (chunk.value[index] === 10) { // 10 is \n
-          const overallIndex = bytesReadSoFar + index
-          startBytes.push(overallIndex)
-        }
+  for await (const chunk of chunks(file)) {
+    for (const [indexInChunk, byteValue] of chunk.value.entries()) {
+      if (byteValue === "\n".charCodeAt(0)) {
+        const thisNewlineIndex = bytesReadSoFar + indexInChunk
+        newlineIndices.push(thisNewlineIndex)
       }
-      bytesReadSoFar += chunk.value.length
-      chunkCount++
     }
+    bytesReadSoFar += chunk.value.length
+    chunkCount++
+
     // TODO: We do need to yield to the event loop periodically,
     // but there's probably a better way of doing this. WebWorker?
     await new Promise((resolve) => { setTimeout(resolve, 0) })
   }
 
-  console.log(`Done reading ${startBytes.length} entries from ${file.size} bytes. Used ${chunkCount} chunks.`)
+  const hasTrailingNewline = (
+    newlineIndices.length > 0
+    && newlineIndices[newlineIndices.length - 1] == file.size - 1
+  )
+
+  const startIndices = [0].concat(newlineIndices.slice(0, hasTrailingNewline ? -1 : undefined))
+
+  console.log(`Done reading ${startIndices.length} entries from ${file.size} bytes. Used ${chunkCount} chunks.`)
 
   return {
-    entryCount: startBytes.length,
+    entryCount: startIndices.length,
     getByteRange: (index: number): [number, number] => {
-      if (0 <= index && index < startBytes.length) {
-        const startByte = startBytes[index]
-        const endByte = index+1 < startBytes.length ? startBytes[index+1] : file.size
+      if (0 <= index && index < startIndices.length) {
+        const startByte = startIndices[index]
+        const endByte = index+1 < startIndices.length ? startIndices[index+1] : file.size
         return [startByte, endByte]
       }
       else {
-        throw new RangeError(`${index} is not in [0, ${startBytes.length}`)
+        throw new RangeError(`${index} is not in [0, ${startIndices.length}`)
       }
     }
   }
