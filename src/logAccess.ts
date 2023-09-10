@@ -38,7 +38,7 @@ export async function buildIndex(
 
   const hasTrailingNewline = (
     newlineIndices.length > 0
-    && newlineIndices[newlineIndices.length - 1] == file.size - 1
+    && newlineIndices[newlineIndices.length - 1] === file.size - 1
   )
 
   const startIndices = [0].concat(newlineIndices.slice(0, hasTrailingNewline ? -1 : undefined))

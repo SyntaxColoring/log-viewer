@@ -54,14 +54,15 @@ function Row({
   }
 }
 
+type LogViewState = { status: "indexed", index: LogIndex } | { status: "indexing", progress: number }
+const initialLogViewState: LogViewState = { status: "indexing", progress: 0 }
+
 function LogView({ file }: { file: File | null }): JSX.Element {
-  type State = { status: "indexed", index: LogIndex } | { status: "indexing", progress: number }
-  const initialState: State = { status: "indexing", progress: 0 }
-  const [state, setState] = React.useState<State>(initialState)
+  const [state, setState] = React.useState<LogViewState>(initialLogViewState)
 
   React.useEffect(() => {
     let ignore = false
-    setState(initialState)
+    setState(initialLogViewState)
 
     const handleProgress = (progress: number) => {
       if (!ignore) setState({status: "indexing", progress})
@@ -76,7 +77,7 @@ function LogView({ file }: { file: File | null }): JSX.Element {
   }, [file])
 
   if (!file) return <></>
-  else if (state.status != "indexed") {
+  else if (state.status !== "indexed") {
     return <>
       <p>Loading...</p>
       <meter value={state.progress}></meter>
@@ -119,6 +120,7 @@ function FilePicker({ setFile }: { setFile: (file: File | null) => void }): JSX.
 }
 
 function Stopwatch() {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [startTime, _] = React.useState(Date.now())
   const [currentTime, setCurrentTime] = React.useState(startTime)
 
