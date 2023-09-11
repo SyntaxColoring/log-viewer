@@ -46,14 +46,15 @@ async function* entries(file: File, index: LogIndex): AsyncGenerator<[number, Lo
   }
 }
 
-async function generateAllRows(file: File, index: LogIndex, container: HTMLElement): Promise<void> {
-  let s = ""
+async function generateAllRows(file: File, index: LogIndex, container: HTMLElement, abortController: AbortController): Promise<void> {
   for await (const [entryNumber, entry] of entries(file, index)) {
-    const htmlElement = renderToStaticMarkup(<Row entryNumber={entryNumber} rowData={entry} />)
-    s += htmlElement
+    if (abortController.signal.aborted) return
+    const htmlMarkup = renderToStaticMarkup(<Row entryNumber={entryNumber} rowData={entry} />)
+    container.insertAdjacentHTML("beforeend", htmlMarkup)
     if (entryNumber % 100 == 0) console.log(entryNumber)
   }
-  container.innerHTML = s
+  console.log("Done. Showing table...")
+  container.setAttribute("style", "")
 }
 
 function AllRows({file, index}: {file: File, index: LogIndex}): JSX.Element {
@@ -61,12 +62,14 @@ function AllRows({file, index}: {file: File, index: LogIndex}): JSX.Element {
   const containerRef = React.useRef(null)
   React.useEffect(() => {
     console.log("useEffect")
+    const abortController = new AbortController()
     if (containerRef.current != null) {
-      generateAllRows(file, index, containerRef.current)
+      generateAllRows(file, index, containerRef.current, abortController)
     }
+    return () => { abortController.abort() }
   }, [containerRef])
 
-  return <tbody ref={containerRef} />
+  return <tbody ref={containerRef} style={{display: "none"}} />
 }
 
 type LogViewState = { status: "indexed", index: LogIndex } | { status: "indexing", progress: number }
