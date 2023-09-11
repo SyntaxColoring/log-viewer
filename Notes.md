@@ -32,9 +32,6 @@ Simplify list virtualization by precomputing each message's line count? Then eac
 
 # Rough priorities
 
-- Test if we actually need virtualization.
-    - It would be good if we could avoid all the complexity of reinventing find/replace, reinventing layout/reflow, reinventing viewport culling...
-
 - Render datetimes as datetimes (in the local timezone?)
 - Searching
 
