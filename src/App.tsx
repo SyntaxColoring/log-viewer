@@ -4,8 +4,6 @@ import { LogEntry, LogIndex, buildIndex, getEntry } from './logAccess'
 
 import { TableVirtuoso } from "react-virtuoso"
 
-import { renderToStaticMarkup } from "react-dom/server"
-
 
 function Datetime({ date }: { date: Date }): JSX.Element {
   const isoString = date.toISOString()
@@ -14,69 +12,52 @@ function Datetime({ date }: { date: Date }): JSX.Element {
 }
 
 function Row({
-  entryNumber,
-  rowData
+  index, file, logIndex
 }: {
-  entryNumber: number
-  rowData: LogEntry
+  index: number,
+  file: File,
+  logIndex: LogIndex
 }): JSX.Element {
-  const priorityClass = [
-    "log-emerg",
-    "log-alert",
-    "log-crit",
-    "log-err",
-    "log-warning",
-    "log-notice",
-    "log-info",
-    "log-debug",
-  ][rowData.priority]
-  return (<tr>
-    <td className={priorityClass}>{entryNumber}</td>
-    <td className={priorityClass}><Datetime date={rowData.timestamp} /></td>
-    <td className={priorityClass}>{rowData.unit}</td>
-    <td className={priorityClass}>{rowData.syslogIdentifier}</td>
-    <td className={priorityClass}><pre>{rowData.message}</pre></td>
-  </tr>)
-}
+  const [rowData, setRowData] = React.useState(null as null | LogEntry)
 
-async function* entries(file: File, index: LogIndex): AsyncGenerator<[number, LogEntry], void>{
-  for (let entryNumber = 0; entryNumber < index.entryCount; entryNumber++) {
-    const entry = await getEntry(file, index, entryNumber)
-    yield [entryNumber, entry]
-  }
-}
-
-async function generateAllRows(file: File, index: LogIndex, container: HTMLElement, abortController: AbortController): Promise<void> {
-  for await (const [entryNumber, entry] of entries(file, index)) {
-    if (abortController.signal.aborted) return
-    const htmlMarkup = renderToStaticMarkup(<Row entryNumber={entryNumber} rowData={entry} />)
-    container.insertAdjacentHTML("beforeend", htmlMarkup)
-    if (entryNumber % 100 == 0) console.log(entryNumber)
-  }
-  console.log("Done. Showing table...")
-  container.setAttribute("style", "")
-}
-
-function AllRows({file, index}: {file: File, index: LogIndex}): JSX.Element {
-  console.log("AllRows")
-  const containerRef = React.useRef(null)
   React.useEffect(() => {
-    console.log("useEffect")
-    const abortController = new AbortController()
-    if (containerRef.current != null) {
-      generateAllRows(file, index, containerRef.current, abortController)
-    }
-    return () => { abortController.abort() }
-  }, [containerRef])
+    let ignore = false
+    getEntry(file, logIndex, index).then((entry: LogEntry) => {
+      if (!ignore) setRowData(entry)
+    })
+    return () => { ignore = true }
+    // TODO: Rate-limit this somehow so we don't consume unbounded memory
+    // if the user scrolls really fast?
+  }, [index, file, logIndex])
 
-  return <tbody ref={containerRef} style={{display: "none"}} />
+  if (rowData == null) {
+    return <td colSpan={5}>Loading...</td>
+  }
+  else {
+    const priorityClass = [
+      "log-emerg",
+      "log-alert",
+      "log-crit",
+      "log-err",
+      "log-warning",
+      "log-notice",
+      "log-info",
+      "log-debug",
+    ][rowData.priority]
+    return (<>
+      <td className={priorityClass}>{index}</td>
+      <td className={priorityClass}><Datetime date={rowData.timestamp} /></td>
+      <td className={priorityClass}>{rowData.unit}</td>
+      <td className={priorityClass}>{rowData.syslogIdentifier}</td>
+      <td className={priorityClass}><pre>{rowData.message}</pre></td>
+    </>)
+  }
 }
 
 type LogViewState = { status: "indexed", index: LogIndex } | { status: "indexing", progress: number }
 const initialLogViewState: LogViewState = { status: "indexing", progress: 0 }
 
 function LogView({ file }: { file: File | null }): JSX.Element {
-  console.log("LogView")
   const [state, setState] = React.useState<LogViewState>(initialLogViewState)
 
   React.useEffect(() => {
@@ -104,8 +85,9 @@ function LogView({ file }: { file: File | null }): JSX.Element {
   }
   else {
     return (
-      <table style={{ height: '100%', width: '100%' }}>
-        <thead>
+      <TableVirtuoso
+        fixedHeaderContent={() => (
+          /* We need to specify an opaque background so the table data isn't visible underneath. */
           <tr style={{ backgroundColor: "white" }}>
             <td style={{ width: "8ch" }}>#</td>
             <td style={{ width: "16ch" }}>Timestamp</td>
@@ -113,9 +95,11 @@ function LogView({ file }: { file: File | null }): JSX.Element {
             <td style={{ width: "32ch" }}>Syslog ID</td>
             <td>Message</td>
           </tr>
-        </thead>
-        <AllRows file={file} index={state.index}/>
-      </table>
+        )}
+        style={{ height: '100%', width: "100%" }}
+        totalCount={state.index.entryCount}
+        itemContent={(entryNumber) => <Row index={entryNumber} file={file} logIndex={state.index} />}
+      />
     )
   }
 }
@@ -160,7 +144,7 @@ function App() {
 
   return (
     <>
-      {/* <Stopwatch /> */}
+      <Stopwatch />
       <FilePicker setFile={setFile} />
       <LogView file={file} />
     </>
