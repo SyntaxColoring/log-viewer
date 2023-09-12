@@ -1,8 +1,10 @@
 import React from 'react';
-import './App.css';
-import { LogEntry, LogIndex, buildIndex, getEntry } from './logAccess'
 
 import { TableVirtuoso } from "react-virtuoso"
+
+import './App.css';
+import { LogEntry, LogIndex, buildIndex, getEntry } from './logAccess'
+import { ResourceMonitor } from './ResourceMonitor'
 
 
 function Datetime({ date }: { date: Date }): JSX.Element {
@@ -119,32 +121,12 @@ function FilePicker({ setFile }: { setFile: (file: File | null) => void }): JSX.
   )
 }
 
-function Stopwatch() {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [startTime, _] = React.useState(Date.now())
-  const [currentTime, setCurrentTime] = React.useState(startTime)
-
-  React.useEffect(() => {
-    let keepGoing = true;
-    const step = () => {
-      setCurrentTime(Date.now())
-      if (keepGoing) window.requestAnimationFrame(step)
-    }
-    window.requestAnimationFrame(step)
-    return () => { keepGoing = false }
-  }, [])
-
-  return (
-    <p>A timer to show when this page stalls up: {currentTime}</p>
-  );
-}
-
 function App() {
   const [file, setFile] = React.useState(null as File | null)
 
   return (
     <>
-      <Stopwatch />
+      <ResourceMonitor />
       <FilePicker setFile={setFile} />
       <LogView file={file} />
     </>
