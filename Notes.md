@@ -34,6 +34,10 @@ Simplify list virtualization by precomputing each message's line count? Then eac
 
 - Render datetimes as datetimes (in the local timezone?)
 - Searching
+    - Linear scan?
+    - https://www.cockroachlabs.com/docs/stable/trigram-indexes
+    - https://en.wikipedia.org/wiki/Compressed_suffix_array
+
 
 - Show full log details in sidebar
 
@@ -61,3 +65,5 @@ Simplify list virtualization by precomputing each message's line count? Then eac
     - Very long horizontal scrolling may not be what people actually want, e.g. for log lines that are long English text
         - Global text wrap toggle?
             - How do we calculate the element heights then? Implement a reflow algorithm in JS?
+
+- Bug: If you change to a second file, the reference to the first one gets yanked and a bunch of components error out because they try to re-render but they can't access it anymore. I guess.
