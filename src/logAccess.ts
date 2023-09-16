@@ -1,6 +1,7 @@
 export interface LogIndex {
   readonly entryCount: number
-  readonly getByteRange: (index: number) => [number, number]
+  readonly getByteRange: (entryNumber: number) => [number, number]
+  readonly getLineCount: (entryNumber: number) => number
 }
 
 export interface LogEntry {
@@ -8,7 +9,7 @@ export interface LogEntry {
   readonly priority: number
   readonly unit: string
   readonly syslogIdentifier: string
-  readonly message: string
+  readonly message: string // TODO: Handle binary data.
 }
 
 export async function buildIndex(
@@ -18,6 +19,7 @@ export async function buildIndex(
   console.log(`Reading ${file.size} bytes...`);
 
   const newlineIndices: number[] = []
+  const lineCounts: number[] = []
   let bytesReadSoFar = 0
   let chunkCount = 0
 
@@ -46,18 +48,39 @@ export async function buildIndex(
 
   console.log(`Done reading ${startIndices.length} entries from ${file.size} bytes. Used ${chunkCount} chunks.`)
 
+  const getByteRange = (entryNumber: number): [number, number] => {
+    if (0 <= entryNumber && entryNumber < startIndices.length) {
+      const startByte = startIndices[entryNumber]
+      const endByte = entryNumber + 1 < startIndices.length ? startIndices[entryNumber + 1] : file.size
+      return [startByte, endByte]
+    }
+    else {
+      throw new RangeError(`${entryNumber} is not in [0, ${startIndices.length}`)
+    }
+  }
+
+  // TODO: Move this to when we're first parsing the entries, for better cache coherence.
+  for (let entryNumber = 0; entryNumber < startIndices.length; entryNumber++) {
+    const [startByte, endByte] = getByteRange(entryNumber)
+    const entry = parseEntry(await file.slice(startByte, endByte).text())
+    const lineCount = countNewlines(entry.message) + 1
+    lineCounts.push(lineCount)
+    if (lineCount != 1) console.log(entryNumber)
+  }
+
+  const getLineCount = (entryNumber: number): number => {
+    if (0 <= entryNumber && entryNumber < startIndices.length) {
+      return lineCounts[entryNumber]
+    }
+    else {
+      throw new RangeError(`${entryNumber} is not in [0, ${startIndices.length}`)
+    }
+  }
+
   return {
     entryCount: startIndices.length,
-    getByteRange: (index: number): [number, number] => {
-      if (0 <= index && index < startIndices.length) {
-        const startByte = startIndices[index]
-        const endByte = index + 1 < startIndices.length ? startIndices[index + 1] : file.size
-        return [startByte, endByte]
-      }
-      else {
-        throw new RangeError(`${index} is not in [0, ${startIndices.length}`)
-      }
-    }
+    getByteRange,
+    getLineCount,
   }
 }
 
@@ -67,8 +90,22 @@ export async function getEntry(file: File, logIndex: LogIndex, entryNumber: numb
   if (byteLength > 32 * 1024) console.warn(`Log entry ${entryNumber} is ${byteLength} bytes large.`)
   const slice = file.slice(startByte, endByte)
   const text = await slice.text()
+  return parseEntry(text)
+}
+
+async function* chunks(file: File) {
+  // It seems like we shouldn't need this function--we should be able to
+  // just do a for-await iteration over file.stream() directly--but I can't get
+  // TypeScript to accept that.
+  const reader = file.stream().getReader()
+  for (let chunk = await reader.read(); !chunk.done; chunk = await reader.read()) {
+    yield chunk
+  }
+}
+
+function parseEntry(rawString: string): LogEntry {
   // TODO: We should probably validate this. The input file is untrusted.
-  const parsed = JSON.parse(text)
+  const parsed = JSON.parse(rawString)
 
   const epochMicroseconds = parseInt(parsed["__REALTIME_TIMESTAMP"])
   return {
@@ -80,12 +117,6 @@ export async function getEntry(file: File, logIndex: LogIndex, entryNumber: numb
   }
 }
 
-async function* chunks(file: File) {
-  // It seems like we shouldn't need this function--we should be able to
-  // just do a for-await iteration over file.stream() directly--but I can't get
-  // TypeScript to accept that.
-  const reader = file.stream().getReader()
-  for (let chunk = await reader.read(); !chunk.done; chunk = await reader.read()) {
-    yield chunk
-  }
+function countNewlines(s: string): number {
+  return (s.match(/\n/g) || []).length
 }
