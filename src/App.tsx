@@ -46,11 +46,11 @@ function Row({
       "log-debug",
     ][rowData.priority]
     return (<>
-      <td className={priorityClass}>{index}</td>
+      <td className={[priorityClass, "align-right"].join(" ")}>{index+1}</td>
       <td className={priorityClass}><Datetime date={rowData.timestamp} /></td>
       <td className={priorityClass}>{rowData.unit}</td>
       <td className={priorityClass}>{rowData.syslogIdentifier}</td>
-      <td className={priorityClass}><pre>{rowData.message}</pre></td>
+      <td className={[priorityClass, "message"].join(" ")}><pre>{rowData.message}</pre></td>
     </>)
   }
 }

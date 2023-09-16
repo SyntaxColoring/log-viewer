@@ -27,16 +27,26 @@ label {
 
 td {
   vertical-align: baseline;
-  border-bottom: 1px solid #aaa
+  border-bottom: 1px solid #aaa;
+
+  /* TODO: CSS line breaks confuse me and these may be redundant. */
+  white-space: nowrap;
+  overflow-x: hidden;
+  text-overflow: ellipsis;
 }
 
-td {
-  overflow-x: auto;
+td.align-right {
+  text-align: right;
+}
+
+td.message {
+  overflow-x: visible;
 }
 
 pre {
   /* Default is 8 on Chrome, which is a bit excessive. */
   tab-size: 4;
+  margin: 0;
 }
 
 .log-debug {
