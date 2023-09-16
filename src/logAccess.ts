@@ -1,5 +1,3 @@
-import lunr from "lunr"
-
 export interface LogIndex {
   readonly entryCount: number
   readonly getByteRange: (index: number) => [number, number]
@@ -48,7 +46,7 @@ export async function buildIndex(
 
   console.log(`Done reading ${startIndices.length} entries from ${file.size} bytes. Used ${chunkCount} chunks.`)
 
-  const result = {
+  return {
     entryCount: startIndices.length,
     getByteRange: (index: number): [number, number] => {
       if (0 <= index && index < startIndices.length) {
@@ -61,32 +59,6 @@ export async function buildIndex(
       }
     }
   }
-
-  const builder = new lunr.Builder();
-  // Cargo-culted from https://github.com/olivernn/lunr.js/issues/497#issuecomment-1706469696.
-  builder.pipeline.add(
-      lunr.trimmer,
-      lunr.stopWordFilter,
-      lunr.stemmer
-  )
-  builder.searchPipeline.add(
-      lunr.stemmer
-  )
-
-  builder.ref('entryNumber');
-  builder.field('message');
-
-  for (let entryNumber = 0; entryNumber < result.entryCount; entryNumber++) {
-    const entry = await getEntry(file, result, entryNumber)
-    builder.add({entryNumber, message: entry.message})
-  }
-
-  const textSearchIndex = builder.build();
-
-  // @ts-ignore
-  window.textSearchIndex = textSearchIndex
-
-  return result
 }
 
 export async function getEntry(file: File, logIndex: LogIndex, entryNumber: number): Promise<LogEntry> {
