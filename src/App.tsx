@@ -2,7 +2,6 @@ import React from 'react';
 
 import { TableVirtuoso } from "react-virtuoso"
 
-import './App.css';
 import { LogEntry, LogIndex, buildIndex, getEntry } from './logAccess'
 import { ResourceMonitor } from './ResourceMonitor'
 
