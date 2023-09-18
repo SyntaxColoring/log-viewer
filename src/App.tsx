@@ -55,33 +55,15 @@ function Row({
   }
 }
 
-type LogViewState = { status: "indexed", index: LogIndex } | { status: "indexing", progress: number }
-const initialLogViewState: LogViewState = { status: "indexing", progress: 0 }
+type IndexState = { status: "indexed", index: LogIndex } | { status: "indexing", progress: number }
+const initialLogViewState: IndexState = { status: "indexing", progress: 0 }
 
-function LogView({ file }: { file: File | null }): JSX.Element {
-  const [state, setState] = React.useState<LogViewState>(initialLogViewState)
-
-  React.useEffect(() => {
-    let ignore = false
-    setState(initialLogViewState)
-
-    const handleProgress = (progress: number) => {
-      if (!ignore) setState({status: "indexing", progress})
-    }
-
-    if (file) {
-      buildIndex(file, handleProgress).then((index) => {
-        if (!ignore) setState({status: "indexed", index})
-      })
-    }
-    return () => { ignore = true }
-  }, [file])
-
+function LogView({ file, indexState }: { file: File | null, indexState: IndexState }): JSX.Element {
   if (!file) return <></>
-  else if (state.status !== "indexed") {
+  else if (indexState.status !== "indexed") {
     return <>
       <p>Loading...</p>
-      <meter value={state.progress}></meter>
+      <meter value={indexState.progress}></meter>
     </>
   }
   else {
@@ -98,8 +80,8 @@ function LogView({ file }: { file: File | null }): JSX.Element {
           </tr>
         )}
         style={{ height: '100%', width: "100%" }}
-        totalCount={state.index.entryCount}
-        itemContent={(entryNumber) => <Row index={entryNumber} file={file} logIndex={state.index} />}
+        totalCount={indexState.index.entryCount}
+        itemContent={(entryNumber) => <Row index={entryNumber} file={file} logIndex={indexState.index} />}
       />
     )
   }
@@ -120,14 +102,82 @@ function FilePicker({ setFile }: { setFile: (file: File | null) => void }): JSX.
   )
 }
 
+type SearchBarState = {
+  status: "noSearch"
+} | {
+  status: "searching"
+} | {
+  status: "searchComplete",
+  matchEntryNumbers: number[],
+  currentMatchNumber: number,
+}
+
+function SearchBar(props: SearchBarState & { onChange: (newSearch: string) => void }): JSX.Element {
+  const enableButtons = props.status === "searchComplete"
+  return <div>
+    <input type="text" onChange={(event) => props.onChange(event.target.value)} />
+    {
+      props.status === "searchComplete" ?
+        <span>{props.currentMatchNumber + 1}/{props.matchEntryNumbers.length}</span>
+        : props.status === "searching" ?
+          <span>...</span>
+          :
+          null
+    }
+    <button disabled={!enableButtons}>⬆️</button>
+    <button disabled={!enableButtons}>⬇️</button>
+  </div>
+}
+
 function App() {
   const [file, setFile] = React.useState(null as File | null)
+
+  const [indexState, setIndexState] = React.useState<IndexState>(initialLogViewState)
+
+  React.useEffect(() => {
+    let ignore = false
+    setIndexState(initialLogViewState)
+
+    const handleProgress = (progress: number) => {
+      if (!ignore) setIndexState({ status: "indexing", progress })
+    }
+
+    if (file) {
+      buildIndex(file, handleProgress).then((index) => {
+        if (!ignore) setIndexState({ status: "indexed", index })
+      })
+    }
+    return () => { ignore = true }
+  }, [file])
+
+  const [searchBarState, setSearchBarState] = React.useState<SearchBarState>({ status: "noSearch" })
+
+  const doSearch = React.useMemo(
+    () => async (substring: string) => {
+      setSearchBarState({status: "searching"}) // TODO: This is race condition prone.
+      if (indexState.status === "indexed") {
+        const matchEntryNumbers = await indexState.index.search(substring)
+        setSearchBarState({
+          status: "searchComplete",
+          matchEntryNumbers,
+          currentMatchNumber: 0 // TODO: Autopopulate this with the closest match?
+        })
+      }
+    },
+    [indexState, setSearchBarState]
+  )
+
+  const searchBarProps = {
+    onChange: doSearch,
+    ...searchBarState
+  }
 
   return (
     <>
       <ResourceMonitor />
+      <SearchBar {...searchBarProps} />
       <FilePicker setFile={setFile} />
-      <LogView file={file} />
+      <LogView file={file} indexState={indexState} />
     </>
   );
 }

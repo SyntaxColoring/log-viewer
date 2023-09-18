@@ -32,12 +32,15 @@ Simplify list virtualization by precomputing each message's line count? Then eac
 
 # Rough priorities
 
+- Fix to maximum line length
+
 - Render datetimes as datetimes (in the local timezone?)
 - Searching
     - Linear scan?
     - https://www.cockroachlabs.com/docs/stable/trigram-indexes
     - https://en.wikipedia.org/wiki/Compressed_suffix_array
-
+    - https://github.com/bvaughn/js-search
+    - https://github.blog/2023-02-06-the-technology-behind-githubs-new-code-search/
 
 - Show full log details in sidebar
 
@@ -67,3 +70,4 @@ Simplify list virtualization by precomputing each message's line count? Then eac
             - How do we calculate the element heights then? Implement a reflow algorithm in JS?
 
 - Bug: If you change to a second file, the reference to the first one gets yanked and a bunch of components error out because they try to re-render but they can't access it anymore. I guess.
+

@@ -1,7 +1,10 @@
+import { NgramIndex } from "./textSearch/ngramIndex"
+
 export interface LogIndex {
   readonly entryCount: number
   readonly getByteRange: (entryNumber: number) => [number, number]
   readonly getLineCount: (entryNumber: number) => number
+  readonly search: (substring: string) => Promise<number[]>
 }
 
 export interface LogEntry {
@@ -17,6 +20,8 @@ export async function buildIndex(
   onProgress: (number: number) => void
 ): Promise<LogIndex> {
   console.log(`Reading ${file.size} bytes...`);
+
+  const textSearchIndex = new NgramIndex<number>(3)
 
   const newlineIndices: number[] = []
   const lineCounts: number[] = []
@@ -63,9 +68,11 @@ export async function buildIndex(
   for (let entryNumber = 0; entryNumber < startIndices.length; entryNumber++) {
     const [startByte, endByte] = getByteRange(entryNumber)
     const entry = parseEntry(await file.slice(startByte, endByte).text())
+
     const lineCount = countNewlines(entry.message) + 1
     lineCounts.push(lineCount)
-    if (lineCount != 1) console.log(entryNumber)
+
+    textSearchIndex.addDocument(entryNumber, entry.message.toLowerCase())
   }
 
   const getLineCount = (entryNumber: number): number => {
@@ -77,10 +84,22 @@ export async function buildIndex(
     }
   }
 
+  const search = async (substring: string): Promise<number[]> => {
+    const candidates = textSearchIndex.search(substring.toLowerCase())
+    const matches: number[] = []
+    for (const candidateNumber of candidates) {
+      const [startByte, endByte] = getByteRange(candidateNumber)
+      const candidate = parseEntry(await file.slice(startByte, endByte).text())
+      if (candidate.message.toLowerCase().includes(substring.toLowerCase())) matches.push(candidateNumber)
+    }
+    return matches
+  }
+
   return {
     entryCount: startIndices.length,
     getByteRange,
     getLineCount,
+    search,
   }
 }
 
