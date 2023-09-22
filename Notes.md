@@ -71,3 +71,6 @@ Simplify list virtualization by precomputing each message's line count? Then eac
 
 - Bug: If you change to a second file, the reference to the first one gets yanked and a bunch of components error out because they try to re-render but they can't access it anymore. I guess.
 
+
+- Keyboard shortcuts
+    Search: focus search bar, jump to next result, jump to prev result
