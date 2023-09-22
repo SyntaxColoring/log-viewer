@@ -1,6 +1,6 @@
 import React from 'react';
 
-import { TableVirtuoso } from "react-virtuoso"
+import { TableVirtuoso, TableVirtuosoHandle } from "react-virtuoso"
 
 import { LogEntry, LogIndex, buildIndex, getEntry } from './logAccess'
 import { ResourceMonitor } from './ResourceMonitor'
@@ -58,7 +58,12 @@ function Row({
 type IndexState = { status: "indexed", index: LogIndex } | { status: "indexing", progress: number }
 const initialLogViewState: IndexState = { status: "indexing", progress: 0 }
 
-function LogView({ file, indexState }: { file: File | null, indexState: IndexState }): JSX.Element {
+const LogView = React.forwardRef(
+  (
+    { file, indexState }: { file: File | null, indexState: IndexState },
+    ref: React.ForwardedRef<TableVirtuosoHandle>
+  ): JSX.Element => {
+
   if (!file) return <></>
   else if (indexState.status !== "indexed") {
     return <>
@@ -69,6 +74,7 @@ function LogView({ file, indexState }: { file: File | null, indexState: IndexSta
   else {
     return (
       <TableVirtuoso
+        ref={ref}
         fixedHeaderContent={() => (
           /* We need to specify an opaque background so the table data isn't visible underneath. */
           <tr style={{ backgroundColor: "white" }}>
@@ -85,7 +91,7 @@ function LogView({ file, indexState }: { file: File | null, indexState: IndexSta
       />
     )
   }
-}
+})
 
 function FilePicker({ setFile }: { setFile: (file: File | null) => void }): JSX.Element {
   return (
@@ -112,24 +118,35 @@ type SearchBarState = {
   currentMatchNumber: number,
 }
 
-function SearchBar(props: SearchBarState & { onChange: (newSearch: string) => void }): JSX.Element {
-  const enableButtons = props.status === "searchComplete"
+function SearchBar(
+  props: SearchBarState & {
+    onChange: (newSearch: string) => void
+    onUp: () => void
+    onDown: () => void
+  }
+): JSX.Element {
+  const enableButtons = props.status === "searchComplete" && props.matchEntryNumbers.length > 0
   return <div>
     <input type="text" onChange={(event) => props.onChange(event.target.value)} />
     {
       props.status === "searchComplete" ?
-        <span>{props.currentMatchNumber + 1}/{props.matchEntryNumbers.length}</span>
+        props.matchEntryNumbers.length > 0 ?
+          <span>{props.currentMatchNumber + 1}/{props.matchEntryNumbers.length}</span>
+          :
+          <span>No matches</span>
         : props.status === "searching" ?
           <span>...</span>
           :
           null
     }
-    <button disabled={!enableButtons}>⬆️</button>
-    <button disabled={!enableButtons}>⬇️</button>
+    <button onClick={props.onUp} disabled={!enableButtons}>⬆️</button>
+    <button onClick={props.onDown} disabled={!enableButtons}>⬇️</button>
   </div>
 }
 
 function App() {
+  const virtuosoRef = React.useRef<TableVirtuosoHandle>(null)
+
   const [file, setFile] = React.useState(null as File | null)
 
   const [indexState, setIndexState] = React.useState<IndexState>(initialLogViewState)
@@ -168,8 +185,23 @@ function App() {
   )
 
   const searchBarProps = {
+    ...searchBarState,
     onChange: doSearch,
-    ...searchBarState
+    onUp: () => {
+      if (searchBarState.status === "searchComplete") {
+        // TODO: Loop.
+        const newMatchNumber = wrap(searchBarState.currentMatchNumber - 1, searchBarState.matchEntryNumbers.length)
+        setSearchBarState({...searchBarState, currentMatchNumber: newMatchNumber})
+        virtuosoRef.current?.scrollToIndex(searchBarState.matchEntryNumbers[newMatchNumber])
+      }
+    },
+    onDown: () => {
+      if (searchBarState.status === "searchComplete") {
+        const newMatchNumber = wrap(searchBarState.currentMatchNumber + 1, searchBarState.matchEntryNumbers.length)
+        setSearchBarState({...searchBarState, currentMatchNumber: newMatchNumber})
+        virtuosoRef.current?.scrollToIndex(searchBarState.matchEntryNumbers[newMatchNumber])
+      }
+    }
   }
 
   return (
@@ -177,9 +209,13 @@ function App() {
       <ResourceMonitor />
       <SearchBar {...searchBarProps} />
       <FilePicker setFile={setFile} />
-      <LogView file={file} indexState={indexState} />
+      <LogView file={file} indexState={indexState} ref={virtuosoRef} />
     </>
   );
+}
+
+function wrap(x: number, m: number): number {
+  return (x%m + m) % m
 }
 
 export default App;
