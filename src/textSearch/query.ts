@@ -12,11 +12,11 @@ export function* findAllMatches(text: string, query: string): Generator<number, 
     if (normalizedQuery !== "") {
         let searchStartIndex = 0;
         while (true) {
-            const matchIndex = normalizedText.indexOf(query, searchStartIndex)
+            const matchIndex = normalizedText.indexOf(normalizedQuery, searchStartIndex)
             if (matchIndex === -1) return
             else {
                 yield matchIndex
-                searchStartIndex = matchIndex + query.length
+                searchStartIndex = matchIndex + normalizedQuery.length
             }
         }
     }
