@@ -4,6 +4,7 @@ import { TableVirtuoso, TableVirtuosoHandle } from "react-virtuoso"
 
 import { LogEntry, LogIndex, buildIndex, getEntry } from './logAccess'
 import { ResourceMonitor } from './ResourceMonitor'
+import { HighlightedText } from './components/HighlightedText';
 
 
 function Datetime({ date }: { date: Date }): JSX.Element {
@@ -13,14 +14,14 @@ function Datetime({ date }: { date: Date }): JSX.Element {
 }
 
 function Row({
-  index, file, logIndex
+  index, file, logIndex, query
 }: {
   index: number,
   file: File,
-  logIndex: LogIndex
+  logIndex: LogIndex,
+  query: string,
 }): JSX.Element {
   const [rowData, setRowData] = React.useState(null as null | LogEntry)
-
   React.useEffect(() => {
     let ignore = false
     getEntry(file, logIndex, index).then((entry: LogEntry) => {
@@ -50,7 +51,9 @@ function Row({
       <td className={priorityClass}><Datetime date={rowData.timestamp} /></td>
       <td className={priorityClass}>{rowData.unit}</td>
       <td className={priorityClass}>{rowData.syslogIdentifier}</td>
-      <td className={[priorityClass, "message"].join(" ")}><pre>{rowData.message}</pre></td>
+      <td className={[priorityClass, "message"].join(" ")}>
+        <pre><HighlightedText text={rowData.message} query={query} /></pre>
+      </td>
     </>)
   }
 }
@@ -60,7 +63,7 @@ const initialLogViewState: IndexState = { status: "indexing", progress: 0 }
 
 const LogView = React.forwardRef(
   (
-    { file, indexState }: { file: File | null, indexState: IndexState },
+    { file, indexState, query}: { file: File | null, indexState: IndexState, query: string},
     ref: React.ForwardedRef<TableVirtuosoHandle>
   ): JSX.Element => {
 
@@ -87,7 +90,7 @@ const LogView = React.forwardRef(
         )}
         style={{ height: '100%', width: "100%" }}
         totalCount={indexState.index.entryCount}
-        itemContent={(entryNumber) => <Row index={entryNumber} file={file} logIndex={indexState.index} />}
+        itemContent={(entryNumber) => <Row index={entryNumber} file={file} logIndex={indexState.index} query={query}/>}
       />
     )
   }
@@ -167,10 +170,12 @@ function App() {
     return () => { ignore = true }
   }, [file])
 
+  const [searchQuery, setSearchQuery] = React.useState("")
   const [searchBarState, setSearchBarState] = React.useState<SearchBarState>({ status: "noSearch" })
 
   const doSearch = React.useMemo(
     () => async (substring: string) => {
+      setSearchQuery(substring)
       setSearchBarState({status: "searching"}) // TODO: This is race condition prone.
       if (indexState.status === "indexed") {
         const matchEntryNumbers = await indexState.index.search(substring)
@@ -209,7 +214,7 @@ function App() {
       <ResourceMonitor />
       <SearchBar {...searchBarProps} />
       <FilePicker setFile={setFile} />
-      <LogView file={file} indexState={indexState} ref={virtuosoRef} />
+      <LogView file={file} indexState={indexState} ref={virtuosoRef} query={searchQuery} />
     </>
   );
 }
