@@ -1,4 +1,5 @@
 import { NgramIndex } from "./textSearch/ngramIndex"
+import { normalize } from "./textSearch/normalize"
 
 export interface LogIndex {
   readonly entryCount: number
@@ -72,7 +73,7 @@ export async function buildIndex(
     const lineCount = countNewlines(entry.message) + 1
     lineCounts.push(lineCount)
 
-    textSearchIndex.addDocument(entryNumber, entry.message.toLowerCase())
+    textSearchIndex.addDocument(entryNumber, normalize(entry.message))
   }
 
   const getLineCount = (entryNumber: number): number => {
@@ -85,12 +86,12 @@ export async function buildIndex(
   }
 
   const search = async (substring: string): Promise<number[]> => {
-    const candidates = textSearchIndex.search(substring.toLowerCase())
+    const candidates = textSearchIndex.search(normalize(substring))
     const matches: number[] = []
     for (const candidateNumber of candidates) {
       const [startByte, endByte] = getByteRange(candidateNumber)
       const candidate = parseEntry(await file.slice(startByte, endByte).text())
-      if (candidate.message.toLowerCase().includes(substring.toLowerCase())) matches.push(candidateNumber)
+      if (normalize(candidate.message).includes(normalize(substring))) matches.push(candidateNumber)
     }
     return matches
   }
