@@ -50,7 +50,7 @@ export default async function* parseNativeFile(
 async function* bytes(
   stream: ReadableStream<Uint8Array>,
 ): AsyncGenerator<number, void, void> {
-  for await (const chunk of chunks(stream)) {
+  for await (const chunk of chunks(stream.getReader())) {
     for (const byte of chunk) {
       yield byte;
     }

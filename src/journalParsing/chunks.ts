@@ -5,9 +5,8 @@
  * https://caniuse.com/mdn-api_readablestream_--asynciterator
  */
 export default async function* chunks<T>(
-  stream: ReadableStream<T>,
+  reader: ReadableStreamDefaultReader<T>,
 ): AsyncGenerator<T, void, void> {
-  const reader = stream.getReader();
   for (
     let chunk = await reader.read();
     !chunk.done;
