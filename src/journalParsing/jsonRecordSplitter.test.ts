@@ -1,8 +1,9 @@
-import { TransformStream } from "node:stream/web";
+import { ReadableStream, TransformStream } from "node:stream/web";
 import { TextDecoder, TextEncoder } from "node:util";
 
 import chunks from "./chunks";
-import jsonRecordSplitter, { ParsedJSON } from "./jsonRecordSplitter";
+import jsonRecordSplitter from "./jsonRecordSplitter";
+import { testReadables } from "./testReadable";
 
 const testData = [
   {
@@ -21,71 +22,74 @@ const testData = [
   },
 ];
 
+// TODO: This is definitely a hack.
+// The testReadables() helper instantiates ReadableStreams,
+// and we can't put this in beforeAll() because we call testReadables() outside of test().
+global.ReadableStream = ReadableStream;
+
 beforeAll(() => {
-  global.TransformStream = TransformStream; // TODO: This seems like a hack?
+  // TODO: This seems like a hack?
+  global.TransformStream = TransformStream;
   global.TextDecoder = TextDecoder;
 });
 
-test.each([{ trailingNewline: true }, { trailingNewline: false }])(
-  "journalctl --output=json",
-  async ({ trailingNewline }) => {
-    let inputString = testData.map((o) => JSON.stringify(o)).join("\n");
-    if (trailingNewline) inputString += "\n";
-    const input = new TextEncoder().encode(inputString);
+describe("journalctl --output=json", () => {
+  describe.each([{ trailingNewline: true }, { trailingNewline: false }])(
+    "%p",
+    ({ trailingNewline }) => {
+      let inputString = testData.map((o) => JSON.stringify(o)).join("\n");
+      if (trailingNewline) inputString += "\n";
+      const inputBytes = new TextEncoder().encode(inputString);
+      const inputReadableStreams = testReadables(inputBytes);
 
-    const subject = jsonRecordSplitter();
-    const writer = subject.writable.getWriter();
-    const reader = subject.readable.getReader();
-
-    const write = async () => {
-      await writer.write(input);
-      await writer.close();
-    };
-
-    const readAll = async () => {
-      const results: ParsedJSON[] = [];
-      for await (const result of chunks(reader)) {
-        results.push(result);
-      }
-      return results;
-    };
-
-    const [_, readResult] = await Promise.all([write(), readAll()]);
-
-    expect(readResult.map((v) => v.parsedJSON)).toStrictEqual(testData);
-
-    const individuallyRereadResults = await Promise.all(
-      readResult.map(async (v) => {
-        const individualSubject = jsonRecordSplitter();
-        const individualWriter = individualSubject.writable.getWriter();
-        const individualReader = individualSubject.readable.getReader();
-
-        const write = async () => {
-          await individualWriter.write(
-            input.slice(v.beginByteIndex, v.endByteIndex),
+      test.each(inputReadableStreams)(
+        "$label",
+        async ({ readableStream: sourceReadable }) => {
+          const subject = jsonRecordSplitter();
+          const result = await allChunks(
+            sourceReadable.pipeThrough(subject).getReader(),
           );
-          await individualWriter.close();
-        };
 
-        const readAll = async () => {
-          const results: ParsedJSON[] = [];
-          for await (const result of chunks(individualReader)) {
-            results.push(result);
+          expect(result.map((v) => v.parsedJSON)).toStrictEqual(testData);
+
+          const individuallyRereadResults = [];
+          for (const resultEntry of result) {
+            const individualSubject = jsonRecordSplitter();
+            const individualWriter = individualSubject.writable.getWriter();
+            const individualReader = individualSubject.readable.getReader();
+            const write = async () => {
+              const slice = inputBytes.slice(
+                resultEntry.beginByteIndex,
+                resultEntry.endByteIndex,
+              );
+              await individualWriter.write(slice);
+              await individualWriter.close();
+            };
+            const read = async () => {
+              return await allChunks(individualReader);
+            };
+
+            const [_, [individualReadResult]] = await Promise.all([
+              write(),
+              read(),
+            ]);
+
+            individuallyRereadResults.push(individualReadResult);
           }
-          return results;
-        };
 
-        const [_, [individualReadResult]] = await Promise.all([
-          write(),
-          readAll(),
-        ]);
+          expect(
+            individuallyRereadResults.map((v) => v.parsedJSON),
+          ).toStrictEqual(testData);
+        },
+      );
+    },
+  );
+});
 
-        return individualReadResult;
-      }),
-    );
-
-    expect(individuallyRereadResults.map((e) => e.parsedJSON)).toStrictEqual(
-      testData,
-    );
-  },
-);
+async function allChunks<T>(
+  reader: ReadableStreamDefaultReader<T>,
+): Promise<T[]> {
+  const result = [];
+  for await (const chunk of chunks(reader)) result.push(chunk);
+  return result;
+}

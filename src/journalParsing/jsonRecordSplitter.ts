@@ -34,12 +34,20 @@ function lineSplitter(): TransformStream<Uint8Array, SplitLine> {
     segment: new Uint8Array(),
   };
 
+  let nextChunkOffset = 0;
+
   return new TransformStream({
     transform(
       chunk: Uint8Array,
       controller: TransformStreamDefaultController<SplitLine>,
     ): void {
-      let splitChunk = arrayUtils.splitUint8Array(chunk, "\n".charCodeAt(0));
+      let splitChunk = arrayUtils
+        .splitUint8Array(chunk, "\n".charCodeAt(0))
+        .map((v) => ({
+          ...v,
+          begin: nextChunkOffset + v.begin,
+          end: nextChunkOffset + v.end,
+        }));
 
       splitChunk[0] = {
         begin: pendingLine.begin,
@@ -61,6 +69,7 @@ function lineSplitter(): TransformStream<Uint8Array, SplitLine> {
         });
       }
       pendingLine = remainder;
+      nextChunkOffset += chunk.byteLength;
     },
 
     flush(controller: TransformStreamDefaultController<SplitLine>) {
