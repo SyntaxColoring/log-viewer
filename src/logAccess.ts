@@ -1,9 +1,13 @@
+import chunks from "./journalParsing/chunks";
+import jsonRecordSplitter, {
+  ParsedJSON,
+} from "./journalParsing/jsonRecordSplitter";
 import { NgramIndex } from "./textSearch/ngramIndex";
 import { normalize } from "./textSearch/normalize";
 
 export interface LogIndex {
   readonly entryCount: number;
-  readonly getByteRange: (entryNumber: number) => [number, number];
+  readonly getEntry: (entryNumber: number) => Promise<LogEntry>;
   readonly getLineCount: (entryNumber: number) => number;
   readonly search: (substring: string) => Promise<number[]>;
 }
@@ -20,87 +24,61 @@ export async function buildIndex(
   file: File,
   onProgress: (number: number) => void,
 ): Promise<LogIndex> {
+  const textSearchIndex = new NgramIndex<number>(3);
+  const metadataIndex: {
+    lineCount: number;
+    startByte: number;
+    endByte: number;
+  }[] = [];
+
   console.log(`Reading ${file.size} bytes...`);
 
-  const textSearchIndex = new NgramIndex<number>(3);
+  const entryStream = file.stream().pipeThrough(jsonRecordSplitter());
 
-  const newlineIndices: number[] = [];
-  const lineCounts: number[] = [];
-  let bytesReadSoFar = 0;
-  let chunkCount = 0;
+  for await (const entry of chunks(entryStream.getReader())) {
+    const newEntryNumber = metadataIndex.length;
+    const parsedEntry = parseEntry(entry);
 
-  for await (const chunk of chunks(file)) {
-    for (const [indexInChunk, byteValue] of chunk.value.entries()) {
-      if (byteValue === "\n".charCodeAt(0)) {
-        const thisNewlineIndex = bytesReadSoFar + indexInChunk;
-        newlineIndices.push(thisNewlineIndex);
-      }
-    }
-    bytesReadSoFar += chunk.value.length;
-    chunkCount++;
+    const lineCount = countNewlines(parsedEntry.message) + 1;
 
-    // TODO: We do need to yield to the event loop periodically,
-    // but there's probably a better way of doing this. WebWorker?
-    await new Promise((resolve) => {
-      setTimeout(resolve, 0);
+    metadataIndex.push({
+      lineCount,
+      startByte: entry.beginByteIndex,
+      endByte: entry.endByteIndex,
     });
-    onProgress(bytesReadSoFar / file.size);
+    textSearchIndex.addDocument(newEntryNumber, normalize(parsedEntry.message));
+
+    if (newEntryNumber % 10000 === 0) {
+      onProgress(entry.endByteIndex / file.size);
+      await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    }
   }
-
-  const hasTrailingNewline =
-    newlineIndices.length > 0 &&
-    newlineIndices[newlineIndices.length - 1] === file.size - 1;
-
-  const startIndices = [0].concat(
-    newlineIndices.slice(0, hasTrailingNewline ? -1 : undefined),
-  );
 
   console.log(
-    `Done reading ${startIndices.length} entries from ${file.size} bytes. Used ${chunkCount} chunks.`,
+    `Done reading ${metadataIndex.length} entries from ${file.size} bytes.`,
   );
 
-  const getByteRange = (entryNumber: number): [number, number] => {
-    if (0 <= entryNumber && entryNumber < startIndices.length) {
-      const startByte = startIndices[entryNumber];
-      const endByte =
-        entryNumber + 1 < startIndices.length
-          ? startIndices[entryNumber + 1]
-          : file.size;
-      return [startByte, endByte];
-    } else {
-      throw new RangeError(
-        `${entryNumber} is not in [0, ${startIndices.length}`,
-      );
-    }
-  };
+  const getByteRange = (entryNumber: number): [number, number] => [
+    metadataIndex[entryNumber].startByte,
+    metadataIndex[entryNumber].endByte,
+  ];
 
-  // TODO: Move this to when we're first parsing the entries, for better cache coherence.
-  for (let entryNumber = 0; entryNumber < startIndices.length; entryNumber++) {
+  const getLineCount = (entryNumber: number): number =>
+    metadataIndex[entryNumber].lineCount;
+
+  const getEntry = async (entryNumber: number): Promise<LogEntry> => {
     const [startByte, endByte] = getByteRange(entryNumber);
-    const entry = parseEntry(await file.slice(startByte, endByte).text());
-
-    const lineCount = countNewlines(entry.message) + 1;
-    lineCounts.push(lineCount);
-
-    textSearchIndex.addDocument(entryNumber, normalize(entry.message));
-  }
-
-  const getLineCount = (entryNumber: number): number => {
-    if (0 <= entryNumber && entryNumber < startIndices.length) {
-      return lineCounts[entryNumber];
-    } else {
-      throw new RangeError(
-        `${entryNumber} is not in [0, ${startIndices.length}`,
-      );
-    }
+    const bytes = file.slice(startByte, endByte);
+    const reader = bytes.stream().pipeThrough(jsonRecordSplitter()).getReader();
+    return parseEntry(await expectOne(chunks(reader)));
   };
 
   const search = async (substring: string): Promise<number[]> => {
+    // TODO: This can be slow. Run it in a WebWorker.
     const candidates = textSearchIndex.search(normalize(substring));
     const matches: number[] = [];
     for (const candidateNumber of candidates) {
-      const [startByte, endByte] = getByteRange(candidateNumber);
-      const candidate = parseEntry(await file.slice(startByte, endByte).text());
+      const candidate = await getEntry(candidateNumber);
       if (normalize(candidate.message).includes(normalize(substring)))
         matches.push(candidateNumber);
     }
@@ -108,55 +86,42 @@ export async function buildIndex(
   };
 
   return {
-    entryCount: startIndices.length,
-    getByteRange,
+    entryCount: metadataIndex.length,
+    getEntry: getEntry,
     getLineCount,
     search,
   };
 }
 
-export async function getEntry(
-  file: File,
-  logIndex: LogIndex,
-  entryNumber: number,
-): Promise<LogEntry> {
-  const [startByte, endByte] = logIndex.getByteRange(entryNumber);
-  const byteLength = endByte - startByte;
-  if (byteLength > 32 * 1024)
-    console.warn(`Log entry ${entryNumber} is ${byteLength} bytes large.`);
-  const slice = file.slice(startByte, endByte);
-  const text = await slice.text();
-  return parseEntry(text);
-}
-
-async function* chunks(file: File) {
-  // It seems like we shouldn't need this function--we should be able to
-  // just do a for-await iteration over file.stream() directly--but I can't get
-  // TypeScript to accept that.
-  const reader = file.stream().getReader();
-  for (
-    let chunk = await reader.read();
-    !chunk.done;
-    chunk = await reader.read()
-  ) {
-    yield chunk;
-  }
-}
-
-function parseEntry(rawString: string): LogEntry {
+function parseEntry(parsed: ParsedJSON): LogEntry {
   // TODO: We should probably validate this. The input file is untrusted.
-  const parsed = JSON.parse(rawString);
-
-  const epochMicroseconds = parseInt(parsed["__REALTIME_TIMESTAMP"]);
+  const json = parsed.parsedJSON;
+  // @ts-ignore
+  const epochMicroseconds = parseInt(json["__REALTIME_TIMESTAMP"]);
   return {
     timestamp: new Date(epochMicroseconds / 1000),
-    priority: parseInt(parsed["PRIORITY"]),
-    unit: parsed["_SYSTEMD_UNIT"], // TODO: Also support _SYSTEMD_USER_UNIT?
-    syslogIdentifier: parsed["SYSLOG_IDENTIFIER"],
-    message: parsed["MESSAGE"],
+    // @ts-ignore
+    priority: parseInt(json["PRIORITY"]),
+    // @ts-ignore
+    unit: json["_SYSTEMD_UNIT"], // TODO: Also support _SYSTEMD_USER_UNIT?
+    // @ts-ignore
+    syslogIdentifier: json["SYSLOG_IDENTIFIER"],
+    // @ts-ignore
+    message: json["MESSAGE"],
   };
 }
 
 function countNewlines(s: string): number {
   return (s.match(/\n/g) || []).length;
+}
+
+async function expectOne<T>(asyncIterator: AsyncIterator<T>): Promise<T> {
+  const result = await asyncIterator.next();
+  if (result.done) throw new Error("Expected exactly one value, but got none.");
+  const afterResult = await asyncIterator.next();
+  if (!afterResult.done)
+    throw new Error(
+      `Expected exactly one value, but got extra: ${afterResult.value}`,
+    );
+  return result.value;
 }

@@ -2,7 +2,7 @@ import React from "react";
 
 import { TableVirtuoso, TableVirtuosoHandle } from "react-virtuoso";
 
-import { LogEntry, LogIndex, buildIndex, getEntry } from "./logAccess";
+import { LogEntry, LogIndex, buildIndex } from "./logAccess";
 import { ResourceMonitor } from "./ResourceMonitor";
 import { HighlightedText } from "./components/HighlightedText";
 
@@ -26,7 +26,7 @@ function Row({
   const [rowData, setRowData] = React.useState(null as null | LogEntry);
   React.useEffect(() => {
     let ignore = false;
-    getEntry(file, logIndex, index).then((entry: LogEntry) => {
+    logIndex.getEntry(index).then((entry: LogEntry) => {
       if (!ignore) setRowData(entry);
     });
     return () => {
