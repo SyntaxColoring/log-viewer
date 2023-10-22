@@ -4,6 +4,7 @@
 // test environment look like a browser, but it looks like it's missing some APIs.
 // So, here, we put those APIs in the global scope ourselves.
 
+import { Blob as NodeBlob } from "node:buffer";
 import {
   TransformStream as NodeTransformStream,
   ReadableStream as NodeReadableStream,
@@ -12,6 +13,12 @@ import { TextDecoder as NodeTextDecoder } from "node:util";
 
 // I don't understand these type errors.
 // I guess there are slight incompatibilities between Node's APIs and the browser's?
+
+// https://github.com/jsdom/jsdom/issues/2555
+// @ts-expect-error
+globalThis.Blob = NodeBlob;
+
+// https://github.com/jsdom/jsdom/issues/2524
 // @ts-expect-error
 globalThis.TextDecoder = NodeTextDecoder;
 // @ts-expect-error

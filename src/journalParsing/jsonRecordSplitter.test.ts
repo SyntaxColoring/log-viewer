@@ -43,27 +43,19 @@ describe("journalctl --output=json", () => {
 
           const individuallyRereadResults = [];
           for (const resultEntry of result) {
-            const individualSubject = jsonRecordSplitter();
-            const individualWriter = individualSubject.writable.getWriter();
-            const individualReader = individualSubject.readable.getReader();
-            const write = async () => {
-              const slice = inputBytes.slice(
+            const source = new Blob([
+              inputBytes.slice(
                 resultEntry.beginByteIndex,
                 resultEntry.endByteIndex,
-              );
-              await individualWriter.write(slice);
-              await individualWriter.close();
-            };
-            const read = async () => {
-              return await allChunks(individualReader);
-            };
-
-            const [_, [individualReadResult]] = await Promise.all([
-              write(),
-              read(),
-            ]);
-
-            individuallyRereadResults.push(individualReadResult);
+              ),
+            ]).stream();
+            const individualSubject = jsonRecordSplitter();
+            const individualReader = source
+              .pipeThrough(individualSubject)
+              .getReader();
+            const [individuallyRereadResult] =
+              await allChunks(individualReader);
+            individuallyRereadResults.push(individuallyRereadResult);
           }
 
           expect(
