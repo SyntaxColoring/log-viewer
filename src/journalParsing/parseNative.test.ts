@@ -219,10 +219,6 @@ const testCases: { filename: string; expectedEvents: NativeParseEvent[] }[] = [
   },
 ];
 
-beforeAll(() => {
-  global.TextDecoder = TextDecoder; // TODO: This seems like a hack?
-});
-
 test.each(testCases)(
   "parse $filename",
   async ({ filename, expectedEvents }) => {

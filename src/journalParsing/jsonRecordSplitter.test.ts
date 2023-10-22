@@ -22,17 +22,6 @@ const testData = [
   },
 ];
 
-// TODO: This is definitely a hack.
-// The testReadables() helper instantiates ReadableStreams,
-// and we can't put this in beforeAll() because we call testReadables() outside of test().
-global.ReadableStream = ReadableStream;
-
-beforeAll(() => {
-  // TODO: This seems like a hack?
-  global.TransformStream = TransformStream;
-  global.TextDecoder = TextDecoder;
-});
-
 describe("journalctl --output=json", () => {
   describe.each([{ trailingNewline: true }, { trailingNewline: false }])(
     "%p",
