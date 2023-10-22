@@ -6,10 +6,13 @@
 
 import { Blob as NodeBlob } from "node:buffer";
 import {
+  TextDecoder as NodeTextDecoder,
+  TextEncoder as NodeTextEncoder,
+} from "node:util";
+import {
   TransformStream as NodeTransformStream,
   ReadableStream as NodeReadableStream,
 } from "node:stream/web";
-import { TextDecoder as NodeTextDecoder } from "node:util";
 
 // I don't understand these type errors.
 // I guess there are slight incompatibilities between Node's APIs and the browser's?
@@ -21,6 +24,8 @@ globalThis.Blob = NodeBlob;
 // https://github.com/jsdom/jsdom/issues/2524
 // @ts-expect-error
 globalThis.TextDecoder = NodeTextDecoder;
+globalThis.TextEncoder = NodeTextEncoder;
+
 // @ts-expect-error
 globalThis.TransformStream = NodeTransformStream;
 // @ts-expect-error

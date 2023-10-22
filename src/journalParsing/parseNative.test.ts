@@ -1,12 +1,7 @@
-/**
- * @jest-environment jsdom
- */
-
 import parseNativeFile from "./parseNative";
 import type { NativeParseEvent } from "./parseNative";
 
 import { open } from "node:fs/promises";
-import { TextDecoder } from "node:util";
 import path from "node:path";
 
 const testCases: { filename: string; expectedEvents: NativeParseEvent[] }[] = [
