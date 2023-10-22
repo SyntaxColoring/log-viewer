@@ -1,4 +1,6 @@
-html, body, #root {
+html,
+body,
+#root {
   /* Make the root elements fill the whole screen so the table can fill
   the whole root elements. */
   height: 100%;
@@ -50,10 +52,11 @@ pre {
 }
 
 .log-debug {
-  color: #666
+  color: #666;
 }
 
-.log-info, .log-notice {
+.log-info,
+.log-notice {
   /* Use the default styling. */
 }
 
@@ -61,6 +64,9 @@ pre {
   background-color: #f2c75c;
 }
 
-.log-err, .log-crit, .log-alert, .log-emerg {
+.log-err,
+.log-crit,
+.log-alert,
+.log-emerg {
   background: #d3273e;
 }
