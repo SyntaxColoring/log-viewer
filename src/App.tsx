@@ -6,6 +6,8 @@ import { LogEntry, LogIndex, buildIndex } from "./logAccess";
 import { ResourceMonitor } from "./ResourceMonitor";
 import { HighlightedText } from "./components/HighlightedText";
 
+import { generateBuffer } from "./workers/generateBuffer";
+
 function Datetime({ date }: { date: Date }): JSX.Element {
   const isoString = date.toISOString();
   const displayString = date.toLocaleDateString();
@@ -276,6 +278,13 @@ function App() {
 
   return (
     <>
+      <button
+        onClick={() => {
+          generateBuffer(100).then(console.log);
+        }}
+      >
+        aaaa
+      </button>
       <ResourceMonitor />
       <SearchBar {...searchBarProps} />
       <FilePicker setFile={setFile} />
