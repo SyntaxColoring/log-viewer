@@ -9,7 +9,10 @@ export interface LogIndex {
   readonly entryCount: number;
   readonly getEntry: (entryNumber: number) => Promise<LogEntry>;
   readonly getLineCount: (entryNumber: number) => number;
-  readonly search: (substring: string) => Promise<number[]>;
+  readonly search: (
+    substring: string,
+    abortSignal?: AbortSignal,
+  ) => Promise<number[]>;
 }
 
 export interface LogEntry {
@@ -73,15 +76,21 @@ export async function buildIndex(
     return parseEntry(await expectOne(chunks(reader)));
   };
 
-  const search = async (substring: string): Promise<number[]> => {
+  const search = async (
+    substring: string,
+    abortSignal?: AbortSignal,
+  ): Promise<number[]> => {
     // TODO: This can be slow. Run it in a WebWorker.
     const candidates = textSearchIndex.search(normalize(substring));
     const matches: number[] = [];
     for (const candidateNumber of candidates) {
+      abortSignal?.throwIfAborted();
       const candidate = await getEntry(candidateNumber);
       if (normalize(candidate.message).includes(normalize(substring)))
         matches.push(candidateNumber);
     }
+
+    abortSignal?.throwIfAborted();
     return matches;
   };
 

@@ -238,22 +238,34 @@ function useSearch(indexState: IndexState, query: string): SearchResult {
   });
 
   React.useEffect(() => {
-    let ignore = false;
+    const abortController = new AbortController();
     if (query === "") {
       setSearchResult({ state: "noSearch" });
     } else if (indexState.status === "indexing") {
       setSearchResult({ state: "inProgress", progress: 0 });
     } else {
-      // TODO: Show the actual progress.
-      setSearchResult({ state: "inProgress", progress: 0.5 });
-      indexState.index.search(query).then((matches) => {
-        if (!ignore) {
+      const doSearch = async () => {
+        // TODO: Show the actual progress.
+        setSearchResult({ state: "inProgress", progress: 0.5 });
+        try {
+          const matches = await indexState.index.search(
+            query,
+            abortController.signal,
+          );
           setSearchResult({ state: "complete", matches });
+        } catch (exception) {
+          if (abortController.signal.aborted) {
+            // The exception is probably the abort. Ignore it.
+          } else {
+            throw exception;
+          }
         }
-      });
+      };
+      doSearch();
     }
     return () => {
-      ignore = true;
+      setSearchResult({ state: "noSearch" });
+      abortController.abort();
     };
   }, [indexState, query]);
 
