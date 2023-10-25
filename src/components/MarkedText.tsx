@@ -1,6 +1,9 @@
 import { findAllMatches } from "../textSearch/query";
 
-export function HighlightedText({
+/**
+ * Renders the bare `text`, with the matching parts wrapped in `<mark>`.
+ **/
+export default function MarkedText({
   text,
   query,
 }: {

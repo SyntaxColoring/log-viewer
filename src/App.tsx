@@ -4,7 +4,7 @@ import { TableVirtuoso, TableVirtuosoHandle } from "react-virtuoso";
 
 import { LogEntry, LogIndex, buildIndex } from "./logAccess";
 import { ResourceMonitor } from "./ResourceMonitor";
-import { HighlightedText } from "./components/HighlightedText";
+import MarkedText from "./components/MarkedText";
 import { SearchBar, Props as SearchBarProps } from "./components/SearchBar";
 
 function Datetime({ date }: { date: Date }): JSX.Element {
@@ -62,7 +62,7 @@ function Row({
         <td className={priorityClass}>{rowData.syslogIdentifier}</td>
         <td className={[priorityClass, "message"].join(" ")}>
           <pre>
-            <HighlightedText text={rowData.message} query={query} />
+            <MarkedText text={rowData.message} query={query} />
           </pre>
         </td>
       </>
