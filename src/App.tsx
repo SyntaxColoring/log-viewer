@@ -5,6 +5,7 @@ import { TableVirtuoso, TableVirtuosoHandle } from "react-virtuoso";
 import { LogEntry, LogIndex, buildIndex } from "./logAccess";
 import { ResourceMonitor } from "./ResourceMonitor";
 import { HighlightedText } from "./components/HighlightedText";
+import { SearchBar, SearchBarState } from "./components/SearchBar";
 
 function Datetime({ date }: { date: Date }): JSX.Element {
   const isoString = date.toISOString();
@@ -139,55 +140,6 @@ function FilePicker({
         }}
       />
     </form>
-  );
-}
-
-type SearchBarState =
-  | {
-      status: "noSearch";
-    }
-  | {
-      status: "searching";
-    }
-  | {
-      status: "searchComplete";
-      matchEntryNumbers: number[];
-      currentMatchNumber: number;
-    };
-
-function SearchBar(
-  props: SearchBarState & {
-    onChange: (newSearch: string) => void;
-    onUp: () => void;
-    onDown: () => void;
-  },
-): JSX.Element {
-  const enableButtons =
-    props.status === "searchComplete" && props.matchEntryNumbers.length > 0;
-  return (
-    <div>
-      <input
-        type="text"
-        onChange={(event) => props.onChange(event.target.value)}
-      />
-      {props.status === "searchComplete" ? (
-        props.matchEntryNumbers.length > 0 ? (
-          <span>
-            {props.currentMatchNumber + 1}/{props.matchEntryNumbers.length}
-          </span>
-        ) : (
-          <span>No matches</span>
-        )
-      ) : props.status === "searching" ? (
-        <span>...</span>
-      ) : null}
-      <button onClick={props.onUp} disabled={!enableButtons}>
-        ⬆️
-      </button>
-      <button onClick={props.onDown} disabled={!enableButtons}>
-        ⬇️
-      </button>
-    </div>
   );
 }
 
