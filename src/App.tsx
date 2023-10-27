@@ -5,7 +5,7 @@ import { TableVirtuoso, TableVirtuosoHandle } from "react-virtuoso";
 import { LogEntry, LogIndex, buildIndex } from "./logAccess";
 import { ResourceMonitor } from "./ResourceMonitor";
 import { HighlightedText } from "./components/HighlightedText";
-import { SearchBar, SearchBarState } from "./components/SearchBar";
+import { SearchBar, Props as SearchBarProps } from "./components/SearchBar";
 
 function Datetime({ date }: { date: Date }): JSX.Element {
   const isoString = date.toISOString();
@@ -170,57 +170,69 @@ function App() {
   }, [file]);
 
   const [searchQuery, setSearchQuery] = React.useState("");
-  const [searchBarState, setSearchBarState] = React.useState<SearchBarState>({
-    status: "noSearch",
-  });
+  const [searchResult, setSearchResult] = React.useState<
+    | { state: "noSearch" }
+    | { state: "inProgress"; progress: number }
+    | { state: "complete"; matches: number[]; currentMatch: number }
+  >({ state: "noSearch" });
 
   const doSearch = React.useMemo(
     () => async (substring: string) => {
       setSearchQuery(substring);
-      setSearchBarState({ status: "searching" }); // TODO: This is race condition prone.
+      // TODO: This is race condition prone. Also, show the actual progress.
+      setSearchResult({ state: "inProgress", progress: 0.5 });
       if (indexState.status === "indexed") {
-        const matchEntryNumbers = await indexState.index.search(substring);
-        setSearchBarState({
-          status: "searchComplete",
-          matchEntryNumbers,
-          currentMatchNumber: 0, // TODO: Autopopulate this with the closest match?
+        const matches = await indexState.index.search(substring);
+        setSearchResult({
+          state: "complete",
+          currentMatch: 0, // TODO: Autopopulate this with the closest match?
+          matches,
         });
       }
     },
-    [indexState, setSearchBarState],
+    [indexState],
   );
 
-  const searchBarProps = {
-    ...searchBarState,
-    onChange: doSearch,
+  const searchBarProps: SearchBarProps = {
+    query: searchQuery,
+    enableButtons: searchResult.state === "complete",
+    status:
+      searchResult.state === "noSearch"
+        ? null
+        : searchResult.state === "inProgress"
+        ? { progress: searchResult.progress }
+        : {
+            currentMatchIndex: searchResult.currentMatch,
+            matchCount: searchResult.matches.length,
+          },
+    onQueryChange: doSearch,
     onUp: () => {
-      if (searchBarState.status === "searchComplete") {
-        // TODO: Loop.
-        const newMatchNumber = wrap(
-          searchBarState.currentMatchNumber - 1,
-          searchBarState.matchEntryNumbers.length,
+      if (searchResult.state === "complete") {
+        const newCurrentMatch = wrap(
+          searchResult.currentMatch - 1,
+          searchResult.matches.length,
         );
-        setSearchBarState({
-          ...searchBarState,
-          currentMatchNumber: newMatchNumber,
+        setSearchResult({
+          ...searchResult,
+          currentMatch: newCurrentMatch,
         });
         virtuosoRef.current?.scrollToIndex(
-          searchBarState.matchEntryNumbers[newMatchNumber],
+          searchResult.matches[newCurrentMatch],
         );
       }
     },
     onDown: () => {
-      if (searchBarState.status === "searchComplete") {
-        const newMatchNumber = wrap(
-          searchBarState.currentMatchNumber + 1,
-          searchBarState.matchEntryNumbers.length,
+      if (searchResult.state === "complete") {
+        const newCurrentMatch = wrap(
+          searchResult.currentMatch + 1,
+          searchResult.matches.length,
         );
-        setSearchBarState({
-          ...searchBarState,
-          currentMatchNumber: newMatchNumber,
+        setSearchResult({
+          ...searchResult,
+          currentMatch: newCurrentMatch,
         });
         virtuosoRef.current?.scrollToIndex(
-          searchBarState.matchEntryNumbers[newMatchNumber],
+          searchResult.matches[newCurrentMatch],
         );
       }
     },
