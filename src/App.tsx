@@ -70,11 +70,6 @@ function Row({
   }
 }
 
-type IndexState =
-  | { status: "indexed"; index: LogIndex }
-  | { status: "indexing"; progress: number };
-const initialLogViewState: IndexState = { status: "indexing", progress: 0 };
-
 const LogView = React.forwardRef(
   (
     {
@@ -147,27 +142,7 @@ function App() {
   const virtuosoRef = React.useRef<TableVirtuosoHandle>(null);
 
   const [file, setFile] = React.useState(null as File | null);
-
-  const [indexState, setIndexState] =
-    React.useState<IndexState>(initialLogViewState);
-
-  React.useEffect(() => {
-    let ignore = false;
-    setIndexState(initialLogViewState);
-
-    const handleProgress = (progress: number) => {
-      if (!ignore) setIndexState({ status: "indexing", progress });
-    };
-
-    if (file) {
-      buildIndex(file, handleProgress).then((index) => {
-        if (!ignore) setIndexState({ status: "indexed", index });
-      });
-    }
-    return () => {
-      ignore = true;
-    };
-  }, [file]);
+  const indexState = useIndex(file);
 
   const [searchQuery, setSearchQuery] = React.useState("");
   const [searchResult, setSearchResult] = React.useState<
@@ -255,6 +230,37 @@ function App() {
 
 function wrap(x: number, m: number): number {
   return ((x % m) + m) % m;
+}
+
+type IndexState =
+  | { status: "indexed"; index: LogIndex }
+  | { status: "indexing"; progress: number };
+
+function useIndex(file: File | null): IndexState {
+  const [indexState, setIndexState] = React.useState<IndexState>({
+    status: "indexing",
+    progress: 0,
+  });
+
+  React.useEffect(() => {
+    let ignore = false;
+    setIndexState({ status: "indexing", progress: 0 });
+
+    const handleProgress = (progress: number) => {
+      if (!ignore) setIndexState({ status: "indexing", progress });
+    };
+
+    if (file) {
+      buildIndex(file, handleProgress).then((index) => {
+        if (!ignore) setIndexState({ status: "indexed", index });
+      });
+    }
+    return () => {
+      ignore = true;
+    };
+  }, [file]);
+
+  return indexState;
 }
 
 export default App;
