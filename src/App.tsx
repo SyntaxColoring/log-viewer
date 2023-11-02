@@ -145,28 +145,20 @@ function App() {
   const indexState = useIndex(file);
 
   const [searchQuery, setSearchQuery] = React.useState("");
-  const [searchResult, setSearchResult] = React.useState<
-    | { state: "noSearch" }
-    | { state: "inProgress"; progress: number }
-    | { state: "complete"; matches: number[]; currentMatch: number }
-  >({ state: "noSearch" });
+  const searchResult = useSearch(indexState, searchQuery);
+  const searchSelection = useSearchSelection(searchResult);
 
-  const doSearch = React.useMemo(
-    () => async (substring: string) => {
-      setSearchQuery(substring);
-      // TODO: This is race condition prone. Also, show the actual progress.
-      setSearchResult({ state: "inProgress", progress: 0.5 });
-      if (indexState.status === "indexed") {
-        const matches = await indexState.index.search(substring);
-        setSearchResult({
-          state: "complete",
-          currentMatch: 0, // TODO: Autopopulate this with the closest match?
-          matches,
-        });
-      }
-    },
-    [indexState],
-  );
+  // Scroll the current selection into view whenever it changes.
+  React.useEffect(() => {
+    if (
+      searchSelection.selection !== null &&
+      searchResult.state === "complete"
+    ) {
+      virtuosoRef.current?.scrollIntoView({
+        index: searchResult.matches[searchSelection.selection],
+      });
+    }
+  }, [searchResult, searchSelection]);
 
   const searchBarProps: SearchBarProps = {
     query: searchQuery,
@@ -177,40 +169,12 @@ function App() {
         : searchResult.state === "inProgress"
         ? { progress: searchResult.progress }
         : {
-            currentMatchIndex: searchResult.currentMatch,
+            currentMatchIndex: searchSelection.selection || 0, // FIXME
             matchCount: searchResult.matches.length,
           },
-    onQueryChange: doSearch,
-    onUp: () => {
-      if (searchResult.state === "complete") {
-        const newCurrentMatch = wrap(
-          searchResult.currentMatch - 1,
-          searchResult.matches.length,
-        );
-        setSearchResult({
-          ...searchResult,
-          currentMatch: newCurrentMatch,
-        });
-        virtuosoRef.current?.scrollToIndex(
-          searchResult.matches[newCurrentMatch],
-        );
-      }
-    },
-    onDown: () => {
-      if (searchResult.state === "complete") {
-        const newCurrentMatch = wrap(
-          searchResult.currentMatch + 1,
-          searchResult.matches.length,
-        );
-        setSearchResult({
-          ...searchResult,
-          currentMatch: newCurrentMatch,
-        });
-        virtuosoRef.current?.scrollToIndex(
-          searchResult.matches[newCurrentMatch],
-        );
-      }
-    },
+    onQueryChange: setSearchQuery,
+    onUp: searchSelection.goUp,
+    onDown: searchSelection.goDown,
   };
 
   return (
@@ -261,6 +225,75 @@ function useIndex(file: File | null): IndexState {
   }, [file]);
 
   return indexState;
+}
+
+type SearchResult =
+  | { state: "noSearch" }
+  | { state: "inProgress"; progress: number }
+  | { state: "complete"; matches: number[] };
+
+function useSearch(indexState: IndexState, query: string): SearchResult {
+  const [searchResult, setSearchResult] = React.useState<SearchResult>({
+    state: "noSearch",
+  });
+
+  React.useEffect(() => {
+    let ignore = false;
+    if (query === "") {
+      setSearchResult({ state: "noSearch" });
+    } else if (indexState.status === "indexing") {
+      setSearchResult({ state: "inProgress", progress: 0 });
+    } else {
+      // TODO: Show the actual progress.
+      setSearchResult({ state: "inProgress", progress: 0.5 });
+      indexState.index.search(query).then((matches) => {
+        if (!ignore) {
+          setSearchResult({ state: "complete", matches });
+        }
+      });
+    }
+    return () => {
+      ignore = true;
+    };
+  }, [indexState, query]);
+
+  return searchResult;
+}
+
+function useSearchSelection(searchResult: SearchResult): {
+  selection: number | null;
+  goUp: () => void;
+  goDown: () => void;
+} {
+  const [selection, setSelection] = React.useState<number | null>(null);
+
+  const increment = (amount: number) => {
+    if (searchResult.state === "complete" && selection !== null) {
+      const newSelection = wrap(
+        selection + amount,
+        searchResult.matches.length,
+      );
+      setSelection(newSelection);
+    }
+  };
+  const goUp = () => {
+    increment(-1);
+  };
+  const goDown = () => {
+    increment(1);
+  };
+
+  // When the search result changes--i.e., when the user has searched for something new--
+  // reset the selection to 0.
+  React.useEffect(() => {
+    if (searchResult.state === "complete") setSelection(0);
+  }, [searchResult]);
+
+  return {
+    selection: searchResult.state === "complete" ? selection : null,
+    goUp,
+    goDown,
+  };
 }
 
 export default App;
