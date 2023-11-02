@@ -166,10 +166,13 @@ function App() {
     enableButtons: searchResult.state === "complete",
     status:
       searchResult.state === "noSearch"
-        ? null
+        ? { type: "noStatus" }
         : searchResult.state === "inProgress"
-        ? { progress: searchResult.progress }
+        ? { type: "progress", progress: searchResult.progress }
+        : searchResult.matches.length === 0
+        ? { type: "noMatches" }
         : {
+            type: "matches",
             currentMatchIndex: searchSelection.selection || 0, // FIXME
             matchCount: searchResult.matches.length,
           },

@@ -6,12 +6,19 @@ import {
 import { IconButton, Separator, TextField } from "@radix-ui/themes";
 
 export type Status =
-  | null
   | {
+      type: "noStatus";
+    }
+  | {
+      type: "progress";
       /** Search progress from 0 to 1. */
       progress: number;
     }
   | {
+      type: "noMatches";
+    }
+  | {
+      type: "matches";
       /** 0-based index of the currently selected match (< matchCount). */
       currentMatchIndex: number;
       matchCount: number;
@@ -69,23 +76,26 @@ export function SearchBar({
 }
 
 function StatusPart({ status }: { status: Status }): JSX.Element {
-  if (status === null) {
-    return <></>;
-  } else if ("progress" in status) {
-    return (
-      <span>
-        Searching...
-        <span style={{ fontVariantNumeric: "tabular-nums" }}>
-          {formatPercent(status.progress)}
+  switch (status.type) {
+    case "noStatus":
+      return <></>;
+    case "progress":
+      return (
+        <span>
+          Searching...
+          <span style={{ fontVariantNumeric: "tabular-nums" }}>
+            {formatPercent(status.progress)}
+          </span>
         </span>
-      </span>
-    );
-  } else {
-    return (
-      <span style={{ fontVariantNumeric: "tabular-nums" }}>
-        {status.currentMatchIndex + 1}/{status.matchCount}
-      </span>
-    );
+      );
+    case "noMatches":
+      return <>No matches</>;
+    case "matches":
+      return (
+        <span style={{ fontVariantNumeric: "tabular-nums" }}>
+          {status.currentMatchIndex + 1}/{status.matchCount}
+        </span>
+      );
   }
 }
 
