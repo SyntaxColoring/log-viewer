@@ -47,10 +47,20 @@ export function SearchBar({
       <TextField.Slot>
         <StatusPart status={status} />
         <Separator orientation="vertical" />
-        <IconButton onClick={onUp} disabled={!enableButtons} variant="ghost">
+        <IconButton
+          title="Previous"
+          disabled={!enableButtons}
+          variant="ghost"
+          onClick={onUp}
+        >
           <ArrowUpIcon />
         </IconButton>
-        <IconButton onClick={onDown} disabled={!enableButtons} variant="ghost">
+        <IconButton
+          title="Next"
+          disabled={!enableButtons}
+          variant="ghost"
+          onClick={onDown}
+        >
           <ArrowDownIcon />
         </IconButton>
       </TextField.Slot>
