@@ -27,9 +27,6 @@ export class NgramIndex<T> {
     const containingDocumentsPerNgram = uniqueSearchNgrams.map(
       (ngram) => this.index.get(ngram) ?? new Set<T>(),
     );
-    console.log("containingDocumentsPerNgram", containingDocumentsPerNgram);
-    console.log("uniqueSearchNgrams", uniqueSearchNgrams);
-    console.log("index", this.index);
     const documentsContainingAllNgrams = intersect(containingDocumentsPerNgram);
     return [...documentsContainingAllNgrams];
   }
