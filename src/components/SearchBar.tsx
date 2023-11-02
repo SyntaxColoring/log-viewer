@@ -62,7 +62,14 @@ function StatusPart({ status }: { status: Status }): JSX.Element {
   if (status === null) {
     return <></>;
   } else if ("progress" in status) {
-    return <>...</>; // TODO: Show a progress indicator here.
+    return (
+      <span>
+        Searching...
+        <span style={{ fontVariantNumeric: "tabular-nums" }}>
+          {formatPercent(status.progress)}
+        </span>
+      </span>
+    );
   } else {
     return (
       <span style={{ fontVariantNumeric: "tabular-nums" }}>
@@ -70,4 +77,8 @@ function StatusPart({ status }: { status: Status }): JSX.Element {
       </span>
     );
   }
+}
+
+function formatPercent(zeroToOne: number): string {
+  return `${Math.round(zeroToOne * 100)}%`;
 }
