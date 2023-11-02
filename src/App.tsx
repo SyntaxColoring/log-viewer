@@ -6,6 +6,7 @@ import { LogEntry, LogIndex, buildIndex } from "./logAccess";
 import { ResourceMonitor } from "./ResourceMonitor";
 import MarkedText from "./components/MarkedText";
 import { SearchBar, Props as SearchBarProps } from "./components/SearchBar";
+import { Box, Flex } from "@radix-ui/themes";
 
 function Datetime({ date }: { date: Date }): JSX.Element {
   const isoString = date.toISOString();
@@ -178,17 +179,19 @@ function App() {
   };
 
   return (
-    <>
+    <Flex direction="column" style={{ height: "100%" }}>
       <ResourceMonitor />
       <SearchBar {...searchBarProps} />
       <FilePicker setFile={setFile} />
-      <LogView
-        file={file}
-        indexState={indexState}
-        ref={virtuosoRef}
-        query={searchQuery}
-      />
-    </>
+      <Box grow="1">
+        <LogView
+          file={file}
+          indexState={indexState}
+          ref={virtuosoRef}
+          query={searchQuery}
+        />
+      </Box>
+    </Flex>
   );
 }
 
