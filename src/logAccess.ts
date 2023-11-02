@@ -11,6 +11,7 @@ export interface LogIndex {
   readonly getLineCount: (entryNumber: number) => number;
   readonly search: (
     substring: string,
+    onProgress?: (progress: number) => void, // Given a progress float 0.0-1.0.
     abortSignal?: AbortSignal,
   ) => Promise<number[]>;
 }
@@ -78,16 +79,21 @@ export async function buildIndex(
 
   const search = async (
     substring: string,
+    onProgress?: (progress: number) => void,
     abortSignal?: AbortSignal,
   ): Promise<number[]> => {
     // TODO: This can be slow. Run it in a WebWorker.
     const candidates = textSearchIndex.search(normalize(substring));
     const matches: number[] = [];
-    for (const candidateNumber of candidates) {
+    for (let i = 0; i < candidates.length; i++) {
       abortSignal?.throwIfAborted();
+
+      const candidateNumber = candidates[i];
       const candidate = await getEntry(candidateNumber);
       if (normalize(candidate.message).includes(normalize(substring)))
         matches.push(candidateNumber);
+
+      onProgress?.(i / (candidates.length - 1));
     }
 
     abortSignal?.throwIfAborted();

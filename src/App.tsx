@@ -218,7 +218,7 @@ function useIndex(file: File | null): IndexState {
     };
 
     if (file) {
-      buildIndex(file, handleProgress).then((index) => {
+      buildIndex(file, debounceProgress(handleProgress)).then((index) => {
         if (!ignore) setIndexState({ status: "indexed", index });
       });
     }
@@ -247,12 +247,15 @@ function useSearch(indexState: IndexState, query: string): SearchResult {
     } else if (indexState.status === "indexing") {
       setSearchResult({ state: "inProgress", progress: 0 });
     } else {
+      const handleProgress = (progress: number) => {
+        setSearchResult({ state: "inProgress", progress });
+      };
       const doSearch = async () => {
-        // TODO: Show the actual progress.
-        setSearchResult({ state: "inProgress", progress: 0.5 });
+        setSearchResult({ state: "inProgress", progress: 0 });
         try {
           const matches = await indexState.index.search(
             query,
+            debounceProgress(handleProgress),
             abortController.signal,
           );
           setSearchResult({ state: "complete", matches });
@@ -308,6 +311,18 @@ function useSearchSelection(searchResult: SearchResult): {
     selection: searchResult.state === "complete" ? selection : null,
     goUp,
     goDown,
+  };
+}
+
+function debounceProgress(
+  onProgress: (progress: number) => void,
+): (progress: number) => void {
+  let lastCheckpoint = 0;
+  return (progress: number) => {
+    if (progress - lastCheckpoint > 0.01) {
+      onProgress(progress);
+      lastCheckpoint = progress;
+    }
   };
 }
 
