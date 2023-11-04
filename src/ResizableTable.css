@@ -1,0 +1,132 @@
+/* Reset all the table tags so they're laid out as normal containers. */
+table,
+thead,
+tbody,
+tr,
+td,
+th {
+  /* TODO: the trs are somehow bigger than the tbody and thead containing them.
+  The visual layout seems fine, but will that complicate efforts to get the current table size? */
+  display: block;
+  margin: 0;
+  border: 0;
+  padding: 0;
+}
+
+table {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+tbody {
+  flex-grow: 1;
+}
+
+tr {
+  display: flex;
+}
+table.noWrapLines tr {
+  /*
+  When line wrapping is disabled, the scrollable width is totally driven by the
+  width of the content and the user-defined column widths, independent of the container.
+  */
+  width: max-content;
+}
+table.wrapLines tr {
+  /*
+  When line wrapping is enabled, the scrollable width is whatever the container provides.
+  The content will have to wrap in order to fit inside that.
+  */
+  width: 100%;
+
+  /*
+  However, the content might not be able to wrap tightly enough to fit in the container.
+  If that happens, make the row as small as it can be.
+
+  I'm not sure if this is actually necessary, but it's intuitive to my brain.
+  It increases the tr's clientWidth to match its scrollWidth.
+  */
+  min-width: min-content;
+}
+
+th,
+td.gutter,
+table.noWrapLines td.main {
+  flex-shrink: 0;
+  flex-grow: 0;
+}
+table.wrapLines td.main {
+  flex-grow: 1;
+  flex-shrink: 1;
+}
+
+th,
+td {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+th,
+td.gutter {
+  white-space: nowrap;
+}
+
+table.noWrapLines td.main {
+  white-space: pre;
+}
+
+table.wrapLines td.main {
+  white-space: break-spaces;
+  overflow-wrap: anywhere;
+}
+
+td,
+th {
+  /* TODO: If the width is manually dragged below this,
+  it can break the 1:1 cursor drag relationship the next time you try to scale it back up. */
+  min-width: 20px;
+}
+
+th,
+td {
+  text-align: left;
+  vertical-align: top;
+}
+
+td:not(:last-child),
+th:not(:last-child) {
+  padding-right: var(--space-2);
+}
+
+th {
+  position: relative;
+}
+
+.resizer {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  width: 4px;
+  cursor: col-resize;
+  background-color: blue;
+}
+
+/*
+Allow scrolling the whole table horizontally, if needed.
+There's always the potential for this being required, even when line wrapping is enabled,
+because the data column has a minimum size and the user might have manually scaled the
+gutter columns to be quite wide.
+*/
+table {
+  overflow-x: auto;
+}
+
+/* TODO: This responsibility belongs to the caller of ResizableTable,
+not ResizableTable itself. */
+td.main {
+  /* TODO: This looks gigantic next to normal text.
+  Investigate how to properly size it to match. */
+  font-family: var(--code-font-family);
+}

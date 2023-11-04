@@ -1,0 +1,23 @@
+.log-view {
+  height: 100%;
+}
+
+.log-debug {
+  color: #666;
+}
+
+.log-info,
+.log-notice {
+  /* Use the default styling. */
+}
+
+.log-warning {
+  background-color: var(--yellow-3);
+}
+
+.log-err,
+.log-crit,
+.log-alert,
+.log-emerg {
+  background-color: var(--red-3);
+}

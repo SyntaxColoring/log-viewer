@@ -1,0 +1,7 @@
+.mark {
+  background-color: var(--yellow-5);
+}
+
+.mark.active {
+  background-color: var(--orange-5);
+}

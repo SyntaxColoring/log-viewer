@@ -1,117 +1,12 @@
 import React from "react";
 
-import { TableVirtuoso, TableVirtuosoHandle } from "react-virtuoso";
+import { Box, Flex, Switch, Text } from "@radix-ui/themes";
+import { VirtuosoHandle } from "react-virtuoso";
 
-import { LogEntry, LogIndex, buildIndex } from "./logAccess";
+import { LogIndex, buildIndex } from "./logAccess";
 import { ResourceMonitor } from "./ResourceMonitor";
-import MarkedText from "./components/MarkedText";
 import { SearchBar, Props as SearchBarProps } from "./components/SearchBar";
-import { Box, Flex } from "@radix-ui/themes";
-import { Datetime } from "./components/Datetime";
-
-function Row({
-  index,
-  file,
-  logIndex,
-  query,
-}: {
-  index: number;
-  file: File;
-  logIndex: LogIndex;
-  query: string;
-}): JSX.Element {
-  const [rowData, setRowData] = React.useState(null as null | LogEntry);
-  React.useEffect(() => {
-    let ignore = false;
-    logIndex.getEntry(index).then((entry: LogEntry) => {
-      if (!ignore) setRowData(entry);
-    });
-    return () => {
-      ignore = true;
-    };
-    // TODO: Rate-limit this somehow so we don't consume unbounded memory
-    // if the user scrolls really fast?
-  }, [index, file, logIndex]);
-
-  if (rowData == null) {
-    return <td colSpan={5}>Loading...</td>;
-  } else {
-    const priorityClass = [
-      "log-emerg",
-      "log-alert",
-      "log-crit",
-      "log-err",
-      "log-warning",
-      "log-notice",
-      "log-info",
-      "log-debug",
-    ][rowData.priority];
-    return (
-      <>
-        <td className={[priorityClass, "align-right"].join(" ")}>
-          {index + 1}
-        </td>
-        <td className={priorityClass}>
-          <Datetime date={rowData.timestamp} />
-        </td>
-        <td className={priorityClass}>{rowData.unit}</td>
-        <td className={priorityClass}>{rowData.syslogIdentifier}</td>
-        <td className={[priorityClass, "message"].join(" ")}>
-          <pre>
-            <MarkedText text={rowData.message} query={query} />
-          </pre>
-        </td>
-      </>
-    );
-  }
-}
-
-const LogView = React.forwardRef(
-  (
-    {
-      file,
-      indexState,
-      query,
-    }: { file: File | null; indexState: IndexState; query: string },
-    ref: React.ForwardedRef<TableVirtuosoHandle>,
-  ): JSX.Element => {
-    if (!file) return <></>;
-    else if (indexState.status !== "indexed") {
-      return (
-        <>
-          <p>Loading...</p>
-          <meter value={indexState.progress}></meter>
-        </>
-      );
-    } else {
-      return (
-        <TableVirtuoso
-          ref={ref}
-          fixedHeaderContent={() => (
-            /* We need to specify an opaque background so the table data isn't visible underneath. */
-            <tr style={{ backgroundColor: "white" }}>
-              <td style={{ width: "8ch" }}>#</td>
-              <td style={{ width: "16ch" }}>Timestamp</td>
-              <td style={{ width: "32ch" }}>Unit</td>
-              <td style={{ width: "32ch" }}>Syslog ID</td>
-              <td>Message</td>
-            </tr>
-          )}
-          style={{ height: "100%", width: "100%" }}
-          totalCount={indexState.index.entryCount}
-          itemContent={(entryNumber) => (
-            <Row
-              index={entryNumber}
-              file={file}
-              logIndex={indexState.index}
-              query={query}
-            />
-          )}
-        />
-      );
-    }
-  },
-);
+import { LogView } from "./LogView";
 
 function FilePicker({
   setFile,
@@ -135,26 +30,29 @@ function FilePicker({
 }
 
 function App() {
-  const virtuosoRef = React.useRef<TableVirtuosoHandle>(null);
+  const virtuosoRef = React.useRef<VirtuosoHandle>(null);
 
   const [file, setFile] = React.useState(null as File | null);
   const indexState = useIndex(file);
+
+  const [wrapLines, setWrapLines] = React.useState(true);
 
   const [searchQuery, setSearchQuery] = React.useState("");
   const searchResult = useSearch(indexState, searchQuery);
   const searchSelection = useSearchSelection(searchResult);
 
+  const selectedRow =
+    searchSelection.selection !== null && searchResult.state === "complete"
+      ? searchResult.matches[searchSelection.selection]
+      : null;
+
   // Scroll the current selection into view whenever it changes.
   React.useEffect(() => {
-    if (
-      searchSelection.selection !== null &&
-      searchResult.state === "complete"
-    ) {
+    if (selectedRow !== null)
       virtuosoRef.current?.scrollIntoView({
-        index: searchResult.matches[searchSelection.selection],
+        index: selectedRow,
       });
-    }
-  }, [searchResult, searchSelection]);
+  }, [selectedRow]);
 
   const searchBarProps: SearchBarProps = {
     query: searchQuery,
@@ -179,14 +77,22 @@ function App() {
   return (
     <Flex direction="column" style={{ height: "100%" }}>
       <ResourceMonitor />
-      <SearchBar {...searchBarProps} />
       <FilePicker setFile={setFile} />
+      <SearchBar {...searchBarProps} />
+      <Flex gap="2">
+        <Text as="label">
+          <Switch checked={wrapLines} onCheckedChange={setWrapLines} />
+          Wrap lines
+        </Text>
+      </Flex>
       <Box grow="1">
         <LogView
           file={file}
           indexState={indexState}
           ref={virtuosoRef}
           query={searchQuery}
+          selectedRow={selectedRow}
+          wrapLines={wrapLines}
         />
       </Box>
     </Flex>
@@ -197,7 +103,7 @@ function wrap(x: number, m: number): number {
   return ((x % m) + m) % m;
 }
 
-type IndexState =
+export type IndexState =
   | { status: "indexed"; index: LogIndex }
   | { status: "indexing"; progress: number };
 

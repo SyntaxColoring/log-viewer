@@ -7,7 +7,7 @@ import { normalize } from "./textSearch/normalize";
 
 export interface LogIndex {
   readonly entryCount: number;
-  readonly getEntry: (entryNumber: number) => Promise<LogEntry>;
+  readonly getEntry: (entryNumber: number) => LogEntry;
   readonly getLineCount: (entryNumber: number) => number;
   readonly search: (
     substring: string,
@@ -29,6 +29,7 @@ export async function buildIndex(
   onProgress: (number: number) => void,
 ): Promise<LogIndex> {
   const textSearchIndex = new NgramIndex<number>(3);
+  const entries: LogEntry[] = [];
   const metadataIndex: {
     lineCount: number;
     startByte: number;
@@ -51,6 +52,7 @@ export async function buildIndex(
       endByte: entry.endByteIndex,
     });
     textSearchIndex.addDocument(newEntryNumber, normalize(parsedEntry.message));
+    entries.push(parsedEntry);
 
     if (newEntryNumber % 10000 === 0) {
       onProgress(entry.endByteIndex / file.size);
@@ -62,19 +64,11 @@ export async function buildIndex(
     `Done reading ${metadataIndex.length} entries from ${file.size} bytes.`,
   );
 
-  const getByteRange = (entryNumber: number): [number, number] => [
-    metadataIndex[entryNumber].startByte,
-    metadataIndex[entryNumber].endByte,
-  ];
-
   const getLineCount = (entryNumber: number): number =>
     metadataIndex[entryNumber].lineCount;
 
-  const getEntry = async (entryNumber: number): Promise<LogEntry> => {
-    const [startByte, endByte] = getByteRange(entryNumber);
-    const bytes = file.slice(startByte, endByte);
-    const reader = bytes.stream().pipeThrough(jsonRecordSplitter()).getReader();
-    return parseEntry(await expectOne(chunks(reader)));
+  const getEntry = (entryNumber: number): LogEntry => {
+    return entries[entryNumber];
   };
 
   const search = async (
@@ -89,7 +83,7 @@ export async function buildIndex(
       abortSignal?.throwIfAborted();
 
       const candidateNumber = candidates[i];
-      const candidate = await getEntry(candidateNumber);
+      const candidate = getEntry(candidateNumber);
       if (normalize(candidate.message).includes(normalize(substring)))
         matches.push(candidateNumber);
 
@@ -128,15 +122,4 @@ function parseEntry(parsed: ParsedJSON): LogEntry {
 
 function countNewlines(s: string): number {
   return (s.match(/\n/g) || []).length;
-}
-
-async function expectOne<T>(asyncIterator: AsyncIterator<T>): Promise<T> {
-  const result = await asyncIterator.next();
-  if (result.done) throw new Error("Expected exactly one value, but got none.");
-  const afterResult = await asyncIterator.next();
-  if (!afterResult.done)
-    throw new Error(
-      `Expected exactly one value, but got extra: ${afterResult.value}`,
-    );
-  return result.value;
 }

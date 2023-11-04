@@ -1,8 +1,9 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import { Theme } from "@radix-ui/themes";
-import App from "./App";
 import reportWebVitals from "./reportWebVitals";
+
+import App from "./App";
 
 import "@radix-ui/themes/styles.css";
 import "./index.css";
@@ -12,7 +13,7 @@ const root = ReactDOM.createRoot(
 );
 root.render(
   <React.StrictMode>
-    <Theme style={{ height: "100%" }}>
+    <Theme className="full-height">
       <App />
     </Theme>
   </React.StrictMode>,

@@ -1,20 +1,30 @@
 import { findAllMatches } from "../textSearch/query";
 
+import "./MarkedText.css";
+
 /**
  * Renders the bare `text`, with the matching parts wrapped in `<mark>`.
  **/
 export default function MarkedText({
   text,
   query,
+  // TODO: MarkedText doesn't have to know about the active row.
+  // We could implement this with CSS selectors alone.
+  isActive,
 }: {
   text: string;
   query: string;
+  isActive: boolean;
 }): JSX.Element {
   const chunks = [...sliceChunks(text, query)];
   return (
     <>
       {chunks.map(({ text, isMatch }) =>
-        isMatch ? <mark>{text}</mark> : text,
+        isMatch ? (
+          <mark className={isActive ? "mark active" : "mark"}>{text}</mark>
+        ) : (
+          text
+        ),
       )}
     </>
   );
