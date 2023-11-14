@@ -7,12 +7,7 @@ import { ResourceMonitor } from "./ResourceMonitor";
 import MarkedText from "./components/MarkedText";
 import { SearchBar, Props as SearchBarProps } from "./components/SearchBar";
 import { Box, Flex } from "@radix-ui/themes";
-
-function Datetime({ date }: { date: Date }): JSX.Element {
-  const isoString = date.toISOString();
-  const displayString = date.toLocaleDateString();
-  return <time dateTime={isoString}>{displayString}</time>;
-}
+import { Datetime } from "./components/Datetime";
 
 function Row({
   index,
