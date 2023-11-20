@@ -7,7 +7,10 @@ export function ResourceMonitor(): JSX.Element {
   React.useEffect(() => {
     const interval = window.setInterval(() => {
       // @ts-ignore
-      setBytes(performance.memory.usedJSHeapSize);
+      if (performance.memory) {
+        // @ts-ignore
+        setBytes(performance.memory.usedJSHeapSize);
+      }
     }, MEASUREMENT_INTERVAL);
     return () => window.clearInterval(interval);
   });
