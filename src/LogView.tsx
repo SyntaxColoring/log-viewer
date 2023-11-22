@@ -79,7 +79,6 @@ export const LogView = React.forwardRef(
                 return (
                   <RowContents
                     index={entryNumber}
-                    file={file}
                     logIndex={indexState.index}
                     query={query}
                     numberWidth={numberWidth}
@@ -100,7 +99,6 @@ export const LogView = React.forwardRef(
 
 function RowContents({
   index,
-  file,
   logIndex,
   query,
   numberWidth,
@@ -110,7 +108,6 @@ function RowContents({
   isSelected,
 }: {
   index: number;
-  file: File;
   logIndex: LogIndex;
   query: string;
   numberWidth: number;
