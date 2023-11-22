@@ -1,3 +1,5 @@
+import { describe, expect, test } from "vitest";
+
 import * as arrayUtils from "./arrayUtils";
 
 describe("concatUint8Array()", () => {

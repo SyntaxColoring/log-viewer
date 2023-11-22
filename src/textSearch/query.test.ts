@@ -1,3 +1,5 @@
+import { expect, it } from "vitest";
+
 import { findAllMatches } from "./query";
 
 it("Finds all matches", () => {

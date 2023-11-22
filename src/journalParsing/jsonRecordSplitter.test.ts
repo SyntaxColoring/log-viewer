@@ -1,3 +1,5 @@
+import { describe, expect, test } from "vitest";
+
 import chunks from "./chunks";
 import jsonRecordSplitter from "./jsonRecordSplitter";
 import { testReadables } from "./testReadable";
