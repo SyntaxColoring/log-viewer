@@ -6,9 +6,9 @@ export function ResourceMonitor(): JSX.Element {
   const [bytes, setBytes] = React.useState<number | null>(null);
   React.useEffect(() => {
     const interval = window.setInterval(() => {
-      // @ts-ignore
+      // @ts-expect-error performance.memory is Chrome-only.
       if (performance.memory) {
-        // @ts-ignore
+        // @ts-expect-error performance.memory is Chrome-only.
         setBytes(performance.memory.usedJSHeapSize);
       }
     }, MEASUREMENT_INTERVAL);

@@ -41,7 +41,7 @@ function lineSplitter(): TransformStream<Uint8Array, SplitLine> {
       chunk: Uint8Array,
       controller: TransformStreamDefaultController<SplitLine>,
     ): void {
-      let splitChunk = arrayUtils
+      const splitChunk = arrayUtils
         .splitUint8Array(chunk, "\n".charCodeAt(0))
         .map((v) => ({
           ...v,

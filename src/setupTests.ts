@@ -17,16 +17,14 @@ import {
 // I don't understand these type errors.
 // I guess there are slight incompatibilities between Node's APIs and the browser's?
 
-// https://github.com/jsdom/jsdom/issues/2555
-// @ts-expect-error
+// @ts-expect-error https://github.com/jsdom/jsdom/issues/2555
 globalThis.Blob = NodeBlob;
 
-// https://github.com/jsdom/jsdom/issues/2524
-// @ts-expect-error
+// @ts-expect-error https://github.com/jsdom/jsdom/issues/2524
 globalThis.TextDecoder = NodeTextDecoder;
 globalThis.TextEncoder = NodeTextEncoder;
 
-// @ts-expect-error
+// @ts-expect-error See above.
 globalThis.TransformStream = NodeTransformStream;
-// @ts-expect-error
+// @ts-expect-error See above.
 globalThis.ReadableStream = NodeReadableStream;

@@ -9,7 +9,7 @@ export function* findAllMatches(
   text: string,
   query: string,
 ): Generator<number, void, void> {
-  let normalizedText = normalize(text);
+  const normalizedText = normalize(text);
   const normalizedQuery = normalize(query);
 
   if (normalizedQuery !== "") {

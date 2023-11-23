@@ -15,5 +15,6 @@ module.exports = {
       "warn",
       { allowConstantExport: true },
     ],
+    "no-constant-condition": ["error", { checkLoops: false }],
   },
 };

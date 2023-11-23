@@ -12,9 +12,8 @@ export default async function* parseNativeFile(
 ): AsyncGenerator<NativeParseEvent, void, void> {
   const byteIterator = bytes(stream);
 
-  // Hack because I don't know idiomatic JS and I want to reuse the generator across loops.
+  // @ts-expect-error Hack because I don't know idiomatic JS and I want to reuse the generator across loops.
   // https://stackoverflow.com/a/70298180/497934
-  // @ts-expect-error
   byteIterator.return = undefined;
 
   while (true) {
