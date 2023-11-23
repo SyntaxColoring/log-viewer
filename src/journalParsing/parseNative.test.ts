@@ -1,9 +1,9 @@
-import { expect, test } from "vitest";
 import { open } from "node:fs/promises";
 import path from "node:path";
+import { expect, test } from "vitest";
 
-import parseNativeFile from "./parseNative";
 import type { NativeParseEvent } from "./parseNative";
+import parseNativeFile from "./parseNative";
 
 const testCases: { filename: string; expectedEvents: NativeParseEvent[] }[] = [
   {

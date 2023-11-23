@@ -6,13 +6,13 @@
 
 import { Blob as NodeBlob } from "node:buffer";
 import {
+  ReadableStream as NodeReadableStream,
+  TransformStream as NodeTransformStream,
+} from "node:stream/web";
+import {
   TextDecoder as NodeTextDecoder,
   TextEncoder as NodeTextEncoder,
 } from "node:util";
-import {
-  TransformStream as NodeTransformStream,
-  ReadableStream as NodeReadableStream,
-} from "node:stream/web";
 
 // I don't understand these type errors.
 // I guess there are slight incompatibilities between Node's APIs and the browser's?

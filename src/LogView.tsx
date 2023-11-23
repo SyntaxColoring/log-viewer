@@ -2,11 +2,10 @@ import React from "react";
 import { Virtuoso, VirtuosoHandle } from "react-virtuoso";
 
 import { IndexState } from "./App";
-import { Datetime } from "./components/Datetime";
-import { LogIndex } from "./logAccess";
 import * as ResizableTable from "./ResizableTable";
-
+import { Datetime } from "./components/Datetime";
 import MarkedText from "./components/MarkedText";
+import { LogIndex } from "./logAccess";
 
 import "./LogView.css";
 

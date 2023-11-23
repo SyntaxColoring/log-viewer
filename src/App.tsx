@@ -1,12 +1,11 @@
-import React from "react";
-
 import { Box, Flex, Switch, Text } from "@radix-ui/themes";
+import React from "react";
 import { VirtuosoHandle } from "react-virtuoso";
 
-import { LogIndex, buildIndex } from "./logAccess";
+import { LogView } from "./LogView";
 import { ResourceMonitor } from "./ResourceMonitor";
 import { SearchBar, Props as SearchBarProps } from "./components/SearchBar";
-import { LogView } from "./LogView";
+import { LogIndex, buildIndex } from "./logAccess";
 
 function FilePicker({
   setFile,
