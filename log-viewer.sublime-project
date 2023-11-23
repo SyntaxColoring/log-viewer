@@ -7,6 +7,18 @@
   "settings": {
     // Tab settings should match Prettier's config.
     "tab_size": 2,
-    "translate_tabs_to_spaces": true
+    "translate_tabs_to_spaces": true,
+    "LSP": {
+      "LSP-eslint": {
+        "settings": {
+          "rulesCustomizations": [
+            // In Sublime Text, show all ESLint violations as warnings.
+            // The true ESLint configuration usually reports them as errors,
+            // which is disruptive while coding.
+            { "rule": "*", "severity": "warn" }
+          ]
+        }
+      }
+    }
   }
 }
