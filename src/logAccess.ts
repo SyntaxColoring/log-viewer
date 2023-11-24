@@ -1,9 +1,13 @@
+import { makeIntervalYielder } from "event-loop-yielder";
+
 import chunks from "./journalParsing/chunks";
 import jsonRecordSplitter, {
   ParsedJSON,
 } from "./journalParsing/jsonRecordSplitter";
 import { NgramIndex } from "./textSearch/ngramIndex";
 import { normalize } from "./textSearch/normalize";
+
+const YIELD_INTERVAL = 1000 / 60;
 
 export interface LogIndex {
   readonly entryCount: number;
@@ -36,6 +40,8 @@ export async function buildIndex(
     endByte: number;
   }[] = [];
 
+  const maybeYieldToEventLoop = makeIntervalYielder(YIELD_INTERVAL);
+
   console.log(`Reading ${file.size} bytes...`);
 
   const entryStream = file.stream().pipeThrough(jsonRecordSplitter());
@@ -56,7 +62,7 @@ export async function buildIndex(
 
     if (newEntryNumber % 10000 === 0) {
       onProgress(entry.endByteIndex / file.size);
-      await new Promise<void>((resolve) => setTimeout(resolve, 0));
+      await maybeYieldToEventLoop();
     }
   }
 
@@ -76,7 +82,9 @@ export async function buildIndex(
     onProgress?: (progress: number) => void,
     abortSignal?: AbortSignal,
   ): Promise<number[]> => {
-    // TODO: This can be slow. Run it in a WebWorker.
+    const maybeYieldToEventLoop = makeIntervalYielder(YIELD_INTERVAL);
+
+    // TODO: This call to textSearchIndex.search() can be slow. Run it in a WebWorker.
     const candidates = textSearchIndex.search(normalize(substring));
     const matches: number[] = [];
     for (let i = 0; i < candidates.length; i++) {
@@ -84,6 +92,8 @@ export async function buildIndex(
 
       const candidateNumber = candidates[i];
       const candidate = getEntry(candidateNumber);
+      await maybeYieldToEventLoop();
+
       if (normalize(candidate.message).includes(normalize(substring)))
         matches.push(candidateNumber);
 
