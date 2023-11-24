@@ -18,7 +18,7 @@ interface SplitLine {
 }
 
 export interface ParsedJSON {
-  parsedJSON: object;
+  parsedJSON: unknown;
   beginByteIndex: number;
   endByteIndex: number;
 }

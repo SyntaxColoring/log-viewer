@@ -96,10 +96,7 @@ async function readNewline(bytes: AsyncIterator<number>): Promise<void> {
 
 async function readFieldName(
   bytes: AsyncIterable<number>,
-): Promise<
-  | "gracefulEOF"
-  | { fieldName: string; termination: typeof EQUALS | typeof NEWLINE }
-> {
+): Promise<"gracefulEOF" | { fieldName: string; termination: number }> {
   const bytesToDecode: number[] = [];
 
   for await (const byte of bytes) {

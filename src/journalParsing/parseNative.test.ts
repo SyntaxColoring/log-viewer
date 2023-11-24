@@ -232,7 +232,7 @@ test.each(testCases)(
       }
       expect(events).toStrictEqual(expectedEvents);
     } finally {
-      file.close();
+      await file.close();
     }
   },
 );

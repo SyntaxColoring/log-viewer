@@ -121,6 +121,8 @@ function useIndex(file: File | null): IndexState {
     };
 
     if (file) {
+      // TODO: Handle errors from this floating promise.
+      // eslint-disable-next-line @typescript-eslint/no-floating-promises
       buildIndex(file, debounceProgress(handleProgress)).then((index) => {
         if (!ignore) setIndexState({ status: "indexed", index });
       });
@@ -170,6 +172,8 @@ function useSearch(indexState: IndexState, query: string): SearchResult {
           }
         }
       };
+      // TODO: Handle errors from this floating promise.
+      // eslint-disable-next-line @typescript-eslint/no-floating-promises
       doSearch();
     }
     return () => {

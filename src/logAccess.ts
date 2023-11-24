@@ -114,19 +114,20 @@ export async function buildIndex(
 
 function parseEntry(parsed: ParsedJSON): LogEntry {
   // TODO: We should probably validate this. The input file is untrusted.
-  const json = parsed.parsedJSON;
-  // @ts-expect-error JSON object is untyped.
-  const epochMicroseconds = parseInt(json["__REALTIME_TIMESTAMP"]);
+  const json = parsed.parsedJSON as {
+    __REALTIME_TIMESTAMP: string;
+    PRIORITY: string;
+    _SYSTEMD_UNIT: string;
+    SYSLOG_IDENTIFIER: string;
+    MESSAGE: string;
+  };
+  const epochMicroseconds = parseInt(json.__REALTIME_TIMESTAMP);
   return {
     timestamp: new Date(epochMicroseconds / 1000),
-    // @ts-expect-error JSON object is untyped.
-    priority: parseInt(json["PRIORITY"]),
-    // @ts-expect-error JSON object is untyped.
-    unit: json["_SYSTEMD_UNIT"], // TODO: Also support _SYSTEMD_USER_UNIT?
-    // @ts-expect-error JSON object is untyped.
-    syslogIdentifier: json["SYSLOG_IDENTIFIER"],
-    // @ts-expect-error JSON object is untyped.
-    message: json["MESSAGE"],
+    priority: parseInt(json.PRIORITY),
+    unit: json._SYSTEMD_UNIT, // TODO: Also support _SYSTEMD_USER_UNIT?
+    syslogIdentifier: json.SYSLOG_IDENTIFIER,
+    message: json.MESSAGE,
   };
 }
 
