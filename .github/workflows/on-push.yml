@@ -1,10 +1,7 @@
-name: Check linting and formatting
-
 on: push
 
 jobs:
-  check-linting-and-formatting:
-    name: Check linting and formatting
+  on-push:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -15,6 +12,10 @@ jobs:
       - run: |
           npm install
       - run: |
+          npm run type-check
+      - run: |
           npm run lint
       - run: |
           npm run format-check
+      - run: |
+          npm run test
