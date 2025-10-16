@@ -32,7 +32,7 @@ export async function buildIndex(
   file: File,
   onProgress: (number: number) => void,
 ): Promise<LogIndex> {
-  const textSearchIndex = new NgramIndex<number>(3);
+  const textSearchIndex = new NgramIndex(3);
   const entries: LogEntry[] = [];
   const metadataIndex: {
     lineCount: number;

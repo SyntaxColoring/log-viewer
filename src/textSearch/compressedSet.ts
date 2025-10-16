@@ -52,9 +52,9 @@ class ByteList {
   #lastBlock: Block;
 
   constructor(blockSizeBytes: number) {
-    this.#blockSizeBytes = 1024*1024
+    this.#blockSizeBytes = blockSizeBytes
     this.#firstBlock = {
-      bytes: new Uint8Array(blockSizeBytes),
+      bytes: new Uint8Array(this.#blockSizeBytes),
       bytesUsedCount: 0,
       next: null,
     };
@@ -69,6 +69,7 @@ class ByteList {
         next: null,
       };
       this.#lastBlock.next = newBlock;
+      this.#lastBlock = newBlock;
     }
 
     this.#lastBlock.bytes[this.#lastBlock.bytesUsedCount] = newByte;
