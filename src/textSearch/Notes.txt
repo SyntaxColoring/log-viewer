@@ -1,0 +1,9 @@
+Open questions:
+
+How much of these gains are from the compression, and how much of them are just from, say, moving from `number` to `int32`?
+
+What do things look like with IndexedDB?
+
+Lots of strings in the JS heap. Is our list virtualizer hanging onto them for some reason?
+
+JS Sets seem to have massive memory overhead. What's 300-400 KiB in our scheme is 5000-6000 KiB with a Set. That goes far beyond a best-case 4x integer compression.
