@@ -1,11 +1,11 @@
 import React from "react";
-import { Virtuoso, VirtuosoHandle } from "react-virtuoso";
+import { Virtuoso, type VirtuosoHandle } from "react-virtuoso";
 
-import { IndexState } from "./App";
+import { type IndexState } from "./App";
 import * as ResizableTable from "./ResizableTable";
 import { Datetime } from "./components/Datetime";
 import MarkedText from "./components/MarkedText";
-import { LogIndex } from "./logAccess";
+import { type LogIndex } from "./logAccess";
 
 import "./LogView.css";
 
@@ -27,7 +27,7 @@ export const LogView = React.forwardRef(
       wrapLines: boolean;
     },
     ref: React.ForwardedRef<VirtuosoHandle>,
-  ): JSX.Element => {
+  ): React.JSX.Element => {
     const [numberWidth, setNumberWidth] = React.useState(0);
     const [timestampWidth, setTimestampWidth] = React.useState(0);
     const [unitWidth, setUnitWidth] = React.useState(0);
@@ -114,7 +114,7 @@ function RowContents({
   unitWidth: number;
   syslogIDWidth: number;
   isSelected: boolean;
-}): JSX.Element {
+}): React.JSX.Element {
   // Ideally, this call to get entry data would be async, and we would initially show a loading
   // placeholder. That would let logIndex avoid having to buffer all the data in memory up-front.
   // Unfortunately, React Virtuoso has a lot of trouble with elements changing height as you

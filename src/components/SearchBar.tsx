@@ -4,6 +4,7 @@ import {
   MagnifyingGlassIcon,
 } from "@radix-ui/react-icons";
 import { IconButton, Separator, TextField } from "@radix-ui/themes";
+import { type JSX } from "react";
 
 export type Status =
   | {
@@ -42,16 +43,16 @@ export function SearchBar({
   onDown,
 }: Props): JSX.Element {
   return (
-    <TextField.Root size="3">
-      <TextField.Slot>
+    <TextField.Root
+      size="3"
+      placeholder="Search messages..."
+      value={query}
+      onChange={(event) => onQueryChange(event.target.value)}
+    >
+      <TextField.Slot side="left">
         <MagnifyingGlassIcon />
       </TextField.Slot>
-      <TextField.Input
-        placeholder="Search messages..."
-        value={query}
-        onChange={(event) => onQueryChange(event.target.value)}
-      />
-      <TextField.Slot>
+      <TextField.Slot side="right">
         <StatusPart status={status} />
         <Separator orientation="vertical" />
         <IconButton

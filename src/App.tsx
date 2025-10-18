@@ -1,11 +1,15 @@
 import { Box, Flex, Switch, Text } from "@radix-ui/themes";
 import React from "react";
-import { VirtuosoHandle } from "react-virtuoso";
+import { type VirtuosoHandle } from "react-virtuoso";
 
+import { type JSX } from "react";
 import { LogView } from "./LogView";
 import { ResourceMonitor } from "./ResourceMonitor";
-import { SearchBar, Props as SearchBarProps } from "./components/SearchBar";
-import { LogIndex, buildIndex } from "./logAccess";
+import {
+  SearchBar,
+  type Props as SearchBarProps,
+} from "./components/SearchBar";
+import { type LogIndex, buildIndex } from "./logAccess";
 
 function FilePicker({
   setFile,
@@ -84,7 +88,7 @@ function App() {
           Wrap lines
         </Text>
       </Flex>
-      <Box grow="1">
+      <Box flexGrow="1">
         <LogView
           file={file}
           indexState={indexState}

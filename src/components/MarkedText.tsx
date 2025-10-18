@@ -2,6 +2,8 @@ import { findAllMatches } from "../textSearch/query";
 
 import "./MarkedText.css";
 
+import { type JSX } from "react";
+
 /**
  * Renders the bare `text`, with the matching parts wrapped in `<mark>`.
  **/

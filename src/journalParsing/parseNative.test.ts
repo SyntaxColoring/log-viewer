@@ -224,6 +224,8 @@ test.each(testCases)(
       // @ts-expect-error: file.readableWebStream() is experimental in our Node version
       // and TypeScript doesn't seem to recognize its existence.
       const stream: ReadableStream<Uint8Array> = file.readableWebStream({
+        // @ts-expect-error: `type: "bytes"` is required on older Node versions and nonexistent
+        // on newer Node versions. :^)
         type: "bytes",
       });
       const events: NativeParseEvent[] = [];

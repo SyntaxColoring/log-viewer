@@ -2,7 +2,7 @@ import { makeIntervalYielder } from "event-loop-yielder";
 
 import chunks from "./journalParsing/chunks";
 import jsonRecordSplitter, {
-  ParsedJSON,
+  type ParsedJSON,
 } from "./journalParsing/jsonRecordSplitter";
 import { NgramIndex } from "./textSearch/ngramIndex";
 import { normalize } from "./textSearch/normalize";

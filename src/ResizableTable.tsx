@@ -1,8 +1,9 @@
 import {
-  ForwardedRef,
+  type ForwardedRef,
+  type JSX,
+  type PropsWithChildren,
+  type ReactNode,
   forwardRef,
-  PropsWithChildren,
-  ReactNode,
   useLayoutEffect,
   useRef,
   useState,

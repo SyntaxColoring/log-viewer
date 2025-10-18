@@ -12,7 +12,7 @@ declare namespace performance {
   };
 }
 
-export function ResourceMonitor(): JSX.Element {
+export function ResourceMonitor(): React.JSX.Element {
   const [bytes, setBytes] = React.useState<number | null>(null);
   React.useEffect(() => {
     const interval = window.setInterval(() => {

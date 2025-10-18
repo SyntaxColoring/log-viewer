@@ -1,3 +1,5 @@
+import { type JSX } from "react";
+
 export function Datetime({ date }: { date: Date }): JSX.Element {
   const isoString = date.toISOString();
   const displayString = date.toLocaleDateString();
