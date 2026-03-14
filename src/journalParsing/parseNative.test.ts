@@ -221,11 +221,9 @@ test.each(testCases)(
     const fixturePath = path.join(__dirname, "testFixtures", filename);
     const file = await open(fixturePath);
     try {
-      // @ts-expect-error: file.readableWebStream() is experimental in our Node version
-      // and TypeScript doesn't seem to recognize its existence.
+      // @ts-expect-error: Node's ReadableStream and DOM ReadableStream type shapes differ; runtime is fine.
       const stream: ReadableStream<Uint8Array> = file.readableWebStream({
-        // @ts-expect-error: `type: "bytes"` is required on older Node versions and nonexistent
-        // on newer Node versions. :^)
+        // @ts-expect-error: `type: "bytes"` exists at runtime but is not in ReadableWebStreamOptions in @types/node.
         type: "bytes",
       });
       const events: NativeParseEvent[] = [];
