@@ -1,9 +1,21 @@
-import { open } from "node:fs/promises";
-import path from "node:path";
 import { expect, test } from "vitest";
 
 import type { NativeParseEvent } from "./parseNative";
 import parseNativeFile from "./parseNative";
+
+const fixtureModules = import.meta.glob<string>("./testFixtures/*.log", {
+  query: "?raw",
+  import: "default",
+});
+
+function stringToStream(s: string): ReadableStream<Uint8Array> {
+  return new ReadableStream({
+    start(controller) {
+      controller.enqueue(new TextEncoder().encode(s));
+      controller.close();
+    },
+  });
+}
 
 const testCases: { filename: string; expectedEvents: NativeParseEvent[] }[] = [
   {
@@ -218,21 +230,14 @@ const testCases: { filename: string; expectedEvents: NativeParseEvent[] }[] = [
 test.each(testCases)(
   "parse $filename",
   async ({ filename, expectedEvents }) => {
-    const fixturePath = path.join(__dirname, "testFixtures", filename);
-    const file = await open(fixturePath);
-    try {
-      // @ts-expect-error: Node's ReadableStream and DOM ReadableStream type shapes differ; runtime is fine.
-      const stream: ReadableStream<Uint8Array> = file.readableWebStream({
-        // @ts-expect-error: `type: "bytes"` exists at runtime but is not in ReadableWebStreamOptions in @types/node.
-        type: "bytes",
-      });
-      const events: NativeParseEvent[] = [];
-      for await (const event of parseNativeFile(stream)) {
-        events.push(event);
-      }
-      expect(events).toStrictEqual(expectedEvents);
-    } finally {
-      await file.close();
+    const load = fixtureModules[`./testFixtures/${filename}`];
+    if (!load) throw new Error(`No fixture module for ${filename}`);
+    const content = await load();
+    const stream = stringToStream(content);
+    const events: NativeParseEvent[] = [];
+    for await (const event of parseNativeFile(stream)) {
+      events.push(event);
     }
+    expect(events).toStrictEqual(expectedEvents);
   },
 );
