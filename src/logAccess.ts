@@ -12,7 +12,6 @@ const YIELD_INTERVAL = 1000 / 60;
 export interface LogIndex {
   readonly entryCount: number;
   readonly getEntry: (entryNumber: number) => LogEntry;
-  readonly getLineCount: (entryNumber: number) => number;
   readonly search: (
     substring: string,
     onProgress?: (progress: number) => void, // Given a progress float 0.0-1.0.
@@ -35,7 +34,6 @@ export async function buildIndex(
   const textSearchIndex = new NgramIndex<number>(3);
   const entries: LogEntry[] = [];
   const metadataIndex: {
-    lineCount: number;
     startByte: number;
     endByte: number;
   }[] = [];
@@ -50,10 +48,7 @@ export async function buildIndex(
     const newEntryNumber = metadataIndex.length;
     const parsedEntry = parseEntry(entry);
 
-    const lineCount = countNewlines(parsedEntry.message) + 1;
-
     metadataIndex.push({
-      lineCount,
       startByte: entry.beginByteIndex,
       endByte: entry.endByteIndex,
     });
@@ -69,9 +64,6 @@ export async function buildIndex(
   console.log(
     `Done reading ${metadataIndex.length} entries from ${file.size} bytes.`,
   );
-
-  const getLineCount = (entryNumber: number): number =>
-    metadataIndex[entryNumber].lineCount;
 
   const getEntry = (entryNumber: number): LogEntry => {
     return entries[entryNumber];
@@ -107,7 +99,6 @@ export async function buildIndex(
   return {
     entryCount: metadataIndex.length,
     getEntry: getEntry,
-    getLineCount,
     search,
   };
 }
@@ -129,8 +120,4 @@ function parseEntry(parsed: ParsedJSON): LogEntry {
     syslogIdentifier: json.SYSLOG_IDENTIFIER,
     message: json.MESSAGE,
   };
-}
-
-function countNewlines(s: string): number {
-  return (s.match(/\n/g) || []).length;
 }
