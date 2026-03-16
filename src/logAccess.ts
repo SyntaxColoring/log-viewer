@@ -9,34 +9,52 @@ import { normalize } from "./textSearch/normalize";
 
 const YIELD_INTERVAL = 1000 / 60;
 
-export interface LogIndex {
-  readonly entryCount: number;
-  readonly getEntry: (entryNumber: number) => LogEntry;
-  readonly search: (
-    substring: string,
-    onProgress?: (progress: number) => void, // Given a progress float 0.0-1.0.
+/** An interface for searching a log file. */
+export interface LogSearcher {
+  /** The total number of entries in the log file. */
+  entryCount: number;
+  search: (
+    params: SearchParams,
     abortSignal?: AbortSignal,
-  ) => Promise<number[]>;
+  ) => Promise<ResultSet>;
+}
+
+export interface SearchParams {
+  /**
+   * If null, do not filter based on substring (return all entries).
+   * If non-null, filter entries whose normalized message includes this substring.
+   */
+  substring: string | null;
+  // TODO: Also allow filtering by unit, priority, etc.
+}
+
+export interface ResultSet {
+  /** The number of entries in this result set. */
+  entryCount: number;
+  /** Get a range of entries [start, end) from this result set. */
+  getEntries: (start: number, end: number) => Promise<LogEntry[]>;
 }
 
 export interface LogEntry {
-  readonly timestamp: Date;
-  readonly priority: number;
-  readonly unit: string;
-  readonly syslogIdentifier: string;
-  readonly message: string; // TODO: Handle binary data.
+  entryNumber: number;
+  timestamp: Date;
+  priority: number;
+  unit: string;
+  syslogIdentifier: string;
+  message: string; // TODO: Handle binary data.
 }
 
-export async function buildIndex(
+interface ByteRange {
+  beginByteIndex: number;
+  endByteIndex: number;
+}
+
+export async function buildLogSearcher(
   file: File,
-  onProgress: (number: number) => void,
-): Promise<LogIndex> {
+  onProgress?: (progress0To1: number) => void,
+): Promise<LogSearcher> {
   const textSearchIndex = new NgramIndex<number>(3);
-  const entries: LogEntry[] = [];
-  const metadataIndex: {
-    startByte: number;
-    endByte: number;
-  }[] = [];
+  const byteRanges: ByteRange[] = [];
 
   const maybeYieldToEventLoop = makeIntervalYielder(YIELD_INTERVAL);
 
@@ -45,65 +63,102 @@ export async function buildIndex(
   const entryStream = file.stream().pipeThrough(jsonRecordSplitter());
 
   for await (const entry of chunks(entryStream.getReader())) {
-    const newEntryNumber = metadataIndex.length;
+    const newEntryNumber = byteRanges.length;
     const parsedEntry = parseEntry(entry);
 
-    metadataIndex.push({
-      startByte: entry.beginByteIndex,
-      endByte: entry.endByteIndex,
+    byteRanges.push({
+      beginByteIndex: entry.beginByteIndex,
+      endByteIndex: entry.endByteIndex,
     });
     textSearchIndex.addDocument(newEntryNumber, normalize(parsedEntry.message));
-    entries.push(parsedEntry);
 
     if (newEntryNumber % 10000 === 0) {
-      onProgress(entry.endByteIndex / file.size);
+      onProgress?.(entry.endByteIndex / file.size);
       await maybeYieldToEventLoop();
     }
   }
 
-  console.log(
-    `Done reading ${metadataIndex.length} entries from ${file.size} bytes.`,
-  );
-
-  const getEntry = (entryNumber: number): LogEntry => {
-    return entries[entryNumber];
+  const getEntry = async (entryNumber: number): Promise<LogEntry> => {
+    const byteRangeForEntry = byteRanges[entryNumber];
+    const byteStreamForEntry = file.slice(
+      byteRangeForEntry.beginByteIndex,
+      byteRangeForEntry.endByteIndex,
+    );
+    // TODO: This stream stuff is a lot of overhead for reading a single entry.
+    const entryReader = byteStreamForEntry
+      .stream()
+      .pipeThrough(jsonRecordSplitter())
+      .getReader();
+    const readResult = await entryReader.read();
+    if (readResult.value === undefined) {
+      throw new Error(
+        `Failed to read entry at byte range: ${byteRangeForEntry.beginByteIndex}, ${byteRangeForEntry.endByteIndex}`,
+      );
+    }
+    const parsed = parseEntry(readResult.value);
+    return { entryNumber, ...parsed };
   };
 
+  console.log(
+    `Done reading ${byteRanges.length} entries from ${file.size} bytes.`,
+  );
+
   const search = async (
-    substring: string,
-    onProgress?: (progress: number) => void,
+    params: SearchParams,
     abortSignal?: AbortSignal,
-  ): Promise<number[]> => {
-    const maybeYieldToEventLoop = makeIntervalYielder(YIELD_INTERVAL);
+  ): Promise<ResultSet> => {
+    if (params.substring === null) {
+      return {
+        entryCount: byteRanges.length,
+        getEntries: async (start, end) => {
+          const results: LogEntry[] = [];
+          for (let i = start; i < end; i++) {
+            const entry = await getEntry(i);
+            results.push(entry);
+          }
+          return results;
+        },
+      };
+    }
 
     // TODO: This call to textSearchIndex.search() can be slow. Run it in a WebWorker.
-    const candidates = textSearchIndex.search(normalize(substring));
-    const matches: number[] = [];
-    for (let i = 0; i < candidates.length; i++) {
+    const candidateEntryNumbers = textSearchIndex.search(
+      normalize(params.substring),
+    );
+    const matchingEntryNumbers: number[] = [];
+    for (let i = 0; i < candidateEntryNumbers.length; i++) {
       abortSignal?.throwIfAborted();
 
-      const candidateNumber = candidates[i];
-      const candidate = getEntry(candidateNumber);
-      await maybeYieldToEventLoop();
+      const candidateNumber = candidateEntryNumbers[i];
+      const candidate = await getEntry(candidateNumber);
 
-      if (normalize(candidate.message).includes(normalize(substring)))
-        matches.push(candidateNumber);
-
-      onProgress?.(i / (candidates.length - 1));
+      if (normalize(candidate.message).includes(normalize(params.substring)))
+        matchingEntryNumbers.push(candidateNumber);
     }
 
     abortSignal?.throwIfAborted();
-    return matches;
+
+    return {
+      entryCount: matchingEntryNumbers.length,
+      getEntries: async (start, end) => {
+        const results: LogEntry[] = [];
+        for (let i = start; i < end; i++) {
+          const entryNumber = matchingEntryNumbers[i];
+          const entry = await getEntry(entryNumber);
+          results.push(entry);
+        }
+        return results;
+      },
+    };
   };
 
   return {
-    entryCount: metadataIndex.length,
-    getEntry: getEntry,
+    entryCount: byteRanges.length,
     search,
   };
 }
 
-function parseEntry(parsed: ParsedJSON): LogEntry {
+function parseEntry(parsed: ParsedJSON): Omit<LogEntry, "entryNumber"> {
   // TODO: We should probably validate this. The input file is untrusted.
   const json = parsed.parsedJSON as {
     __REALTIME_TIMESTAMP: string;

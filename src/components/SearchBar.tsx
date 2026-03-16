@@ -1,9 +1,5 @@
-import {
-  ArrowDownIcon,
-  ArrowUpIcon,
-  MagnifyingGlassIcon,
-} from "@radix-ui/react-icons";
-import { IconButton, Separator, TextField } from "@radix-ui/themes";
+import { MagnifyingGlassIcon } from "@radix-ui/react-icons";
+import { TextField } from "@radix-ui/themes";
 import { type JSX } from "react";
 
 export type Status =
@@ -12,35 +8,25 @@ export type Status =
     }
   | {
       type: "progress";
-      /** Search progress from 0 to 1. */
-      progress: number;
     }
   | {
       type: "noMatches";
     }
   | {
       type: "matches";
-      /** 0-based index of the currently selected match (< matchCount). */
-      currentMatchIndex: number;
       matchCount: number;
     };
 
 export interface Props {
   query: string;
-  enableButtons: boolean;
   status: Status;
   onQueryChange: (newQuery: string) => void;
-  onUp: () => void;
-  onDown: () => void;
 }
 
 export function SearchBar({
   query,
-  enableButtons,
   status,
   onQueryChange,
-  onUp,
-  onDown,
 }: Props): JSX.Element {
   return (
     <TextField.Root
@@ -54,23 +40,6 @@ export function SearchBar({
       </TextField.Slot>
       <TextField.Slot side="right">
         <StatusPart status={status} />
-        <Separator orientation="vertical" />
-        <IconButton
-          title="Previous"
-          disabled={!enableButtons}
-          variant="ghost"
-          onClick={onUp}
-        >
-          <ArrowUpIcon />
-        </IconButton>
-        <IconButton
-          title="Next"
-          disabled={!enableButtons}
-          variant="ghost"
-          onClick={onDown}
-        >
-          <ArrowDownIcon />
-        </IconButton>
       </TextField.Slot>
     </TextField.Root>
   );
@@ -81,25 +50,14 @@ function StatusPart({ status }: { status: Status }): JSX.Element {
     case "noStatus":
       return <></>;
     case "progress":
-      return (
-        <span>
-          Searching...
-          <span style={{ fontVariantNumeric: "tabular-nums" }}>
-            {formatPercent(status.progress)}
-          </span>
-        </span>
-      );
+      return <span>Searching...</span>;
     case "noMatches":
-      return <>No matches</>;
+      return <>No results</>;
     case "matches":
       return (
         <span style={{ fontVariantNumeric: "tabular-nums" }}>
-          {status.currentMatchIndex + 1}/{status.matchCount}
+          {status.matchCount} results
         </span>
       );
   }
-}
-
-function formatPercent(zeroToOne: number): string {
-  return `${Math.round(zeroToOne * 100)}%`;
 }

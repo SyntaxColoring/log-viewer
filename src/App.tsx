@@ -9,7 +9,11 @@ import {
   SearchBar,
   type Props as SearchBarProps,
 } from "./components/SearchBar";
-import { type LogIndex, buildIndex } from "./logAccess";
+import {
+  type LogSearcher,
+  type ResultSet,
+  buildLogSearcher,
+} from "./logAccess";
 
 function FilePicker({
   setFile,
@@ -36,45 +40,31 @@ function App() {
   const virtuosoRef = React.useRef<VirtuosoHandle>(null);
 
   const [file, setFile] = React.useState(null as File | null);
-  const indexState = useIndex(file);
+  const searcherState = useSearcherState(file);
 
   const [wrapLines, setWrapLines] = React.useState(true);
 
   const [searchQuery, setSearchQuery] = React.useState("");
-  const searchResult = useSearch(indexState, searchQuery);
-  const searchSelection = useSearchSelection(searchResult);
-
-  const selectedRow =
-    searchSelection.selection !== null && searchResult.state === "complete"
-      ? searchResult.matches[searchSelection.selection]
-      : null;
-
-  // Scroll the current selection into view whenever it changes.
-  React.useEffect(() => {
-    if (selectedRow !== null)
-      virtuosoRef.current?.scrollIntoView({
-        index: selectedRow,
-      });
-  }, [selectedRow]);
+  const searchResult = useSearch(searcherState, searchQuery);
 
   const searchBarProps: SearchBarProps = {
     query: searchQuery,
-    enableButtons: searchResult.state === "complete",
     status:
       searchResult.state === "noSearch"
         ? { type: "noStatus" }
         : searchResult.state === "inProgress"
-        ? { type: "progress", progress: searchResult.progress }
-        : searchResult.matches.length === 0
+        ? { type: "progress" }
+        : searchResult.state === "complete" &&
+          searchResult.resultSet.entryCount === 0
         ? { type: "noMatches" }
         : {
             type: "matches",
-            currentMatchIndex: searchSelection.selection || 0, // FIXME
-            matchCount: searchResult.matches.length,
+            matchCount:
+              searchResult.state === "complete"
+                ? searchResult.resultSet.entryCount
+                : 0,
           },
     onQueryChange: setSearchQuery,
-    onUp: searchSelection.goUp,
-    onDown: searchSelection.goDown,
   };
 
   return (
@@ -91,10 +81,12 @@ function App() {
       <Box flexGrow="1">
         <LogView
           file={file}
-          indexState={indexState}
+          searcherState={searcherState}
+          resultSet={
+            searchResult.state === "complete" ? searchResult.resultSet : null
+          }
           ref={virtuosoRef}
           query={searchQuery}
-          selectedRow={selectedRow}
           wrapLines={wrapLines}
         />
       </Box>
@@ -102,72 +94,66 @@ function App() {
   );
 }
 
-function wrap(x: number, m: number): number {
-  return ((x % m) + m) % m;
-}
-
-export type IndexState =
-  | { status: "indexed"; index: LogIndex }
+export type SearcherState =
+  | { status: "noFile" }
+  | { status: "indexed"; searcher: LogSearcher }
   | { status: "indexing"; progress: number };
 
-function useIndex(file: File | null): IndexState {
-  const [indexState, setIndexState] = React.useState<IndexState>({
-    status: "indexing",
-    progress: 0,
+function useSearcherState(file: File | null): SearcherState {
+  const [searcherState, setSearcherState] = React.useState<SearcherState>({
+    status: "noFile",
   });
 
   React.useEffect(() => {
     let ignore = false;
-    setIndexState({ status: "indexing", progress: 0 });
+    if (!file) {
+      setSearcherState({ status: "noFile" });
+    } else {
+      setSearcherState({ status: "indexing", progress: 0 });
 
-    const handleProgress = (progress: number) => {
-      if (!ignore) setIndexState({ status: "indexing", progress });
-    };
+      const handleProgress = (progress: number) => {
+        if (!ignore) setSearcherState({ status: "indexing", progress });
+      };
 
-    if (file) {
       // TODO: Handle errors from this floating promise.
       // eslint-disable-next-line @typescript-eslint/no-floating-promises
-      buildIndex(file, debounceProgress(handleProgress)).then((index) => {
-        if (!ignore) setIndexState({ status: "indexed", index });
-      });
+      buildLogSearcher(file, debounceProgress(handleProgress)).then(
+        (searcher) => {
+          if (!ignore) setSearcherState({ status: "indexed", searcher });
+        },
+      );
     }
     return () => {
       ignore = true;
     };
   }, [file]);
 
-  return indexState;
+  return searcherState;
 }
 
 type SearchResult =
   | { state: "noSearch" }
-  | { state: "inProgress"; progress: number }
-  | { state: "complete"; matches: number[] };
+  | { state: "inProgress" }
+  | { state: "complete"; resultSet: ResultSet };
 
-function useSearch(indexState: IndexState, query: string): SearchResult {
+function useSearch(searcherState: SearcherState, query: string): SearchResult {
   const [searchResult, setSearchResult] = React.useState<SearchResult>({
     state: "noSearch",
   });
 
   React.useEffect(() => {
     const abortController = new AbortController();
-    if (query === "") {
+    if (searcherState.status !== "indexed") {
       setSearchResult({ state: "noSearch" });
-    } else if (indexState.status === "indexing") {
-      setSearchResult({ state: "inProgress", progress: 0 });
     } else {
-      const handleProgress = (progress: number) => {
-        setSearchResult({ state: "inProgress", progress });
-      };
       const doSearch = async () => {
-        setSearchResult({ state: "inProgress", progress: 0 });
+        setSearchResult({ state: "inProgress" });
         try {
-          const matches = await indexState.index.search(
-            query,
-            debounceProgress(handleProgress),
+          const nextResultSet = await searcherState.searcher.search(
+            { substring: query === "" ? null : query },
             abortController.signal,
           );
-          setSearchResult({ state: "complete", matches });
+          setSearchResult({ state: "complete", resultSet: nextResultSet });
         } catch (exception) {
           if (abortController.signal.aborted) {
             // The exception is probably the abort. Ignore it.
@@ -181,48 +167,11 @@ function useSearch(indexState: IndexState, query: string): SearchResult {
       doSearch();
     }
     return () => {
-      setSearchResult({ state: "noSearch" });
       abortController.abort();
     };
-  }, [indexState, query]);
+  }, [searcherState, query]);
 
   return searchResult;
-}
-
-function useSearchSelection(searchResult: SearchResult): {
-  selection: number | null;
-  goUp: () => void;
-  goDown: () => void;
-} {
-  const [selection, setSelection] = React.useState<number | null>(null);
-
-  const increment = (amount: number) => {
-    if (searchResult.state === "complete" && selection !== null) {
-      const newSelection = wrap(
-        selection + amount,
-        searchResult.matches.length,
-      );
-      setSelection(newSelection);
-    }
-  };
-  const goUp = () => {
-    increment(-1);
-  };
-  const goDown = () => {
-    increment(1);
-  };
-
-  // When the search result changes--i.e., when the user has searched for something new--
-  // reset the selection to 0.
-  React.useEffect(() => {
-    if (searchResult.state === "complete") setSelection(0);
-  }, [searchResult]);
-
-  return {
-    selection: searchResult.state === "complete" ? selection : null,
-    goUp,
-    goDown,
-  };
 }
 
 function debounceProgress(

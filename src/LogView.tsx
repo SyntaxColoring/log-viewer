@@ -1,11 +1,11 @@
 import React, { type Ref } from "react";
 import { Virtuoso, type VirtuosoHandle } from "react-virtuoso";
 
-import { type IndexState } from "./App";
+import { type SearcherState } from "./App";
 import * as ResizableTable from "./ResizableTable";
 import { Datetime } from "./components/Datetime";
 import MarkedText from "./components/MarkedText";
-import { type LogIndex } from "./logAccess";
+import { type LogEntry, type ResultSet } from "./logAccess";
 
 import "./LogView.css";
 
@@ -13,19 +13,19 @@ const VIRTUOSO_OVERSCAN = 1000;
 
 export type LogViewProps = {
   file: File | null;
-  indexState: IndexState;
+  searcherState: SearcherState;
+  resultSet: ResultSet | null;
   query: string;
-  selectedRow: number | null;
   wrapLines: boolean;
   ref?: Ref<VirtuosoHandle>;
 };
 
 export function LogView({
   file,
-  indexState,
+  searcherState,
+  resultSet,
   query,
   ref,
-  selectedRow,
   wrapLines,
 }: LogViewProps): React.JSX.Element {
   const [numberWidth, setNumberWidth] = React.useState(0);
@@ -33,14 +33,12 @@ export function LogView({
   const [unitWidth, setUnitWidth] = React.useState(0);
   const [syslogIDWidth, setSyslogIDWidth] = React.useState(0);
 
-  // TODO: These probably need to set the ref?
-  // Can a React ref be present sometimes but not other times?
   if (!file) return <></>;
-  if (indexState.status !== "indexed") {
+  if (searcherState.status === "indexing") {
     return (
       <>
         <p>Loading...</p>
-        <meter value={indexState.progress}></meter>
+        <meter value={searcherState.progress}></meter>
       </>
     );
   }
@@ -70,25 +68,26 @@ export function LogView({
         <ResizableTable.HeaderMainCell text="Message" />
       </ResizableTable.Header>
       <ResizableTable.Body>
-        <Virtuoso
-          ref={ref}
-          totalCount={indexState.index.entryCount}
-          overscan={{ main: VIRTUOSO_OVERSCAN, reverse: VIRTUOSO_OVERSCAN }}
-          itemContent={(entryNumber) => {
-            return (
-              <RowContents
-                index={entryNumber}
-                logIndex={indexState.index}
-                query={query}
-                numberWidth={numberWidth}
-                timestampWidth={timestampWidth}
-                unitWidth={unitWidth}
-                syslogIDWidth={syslogIDWidth}
-                isSelected={entryNumber === selectedRow}
-              />
-            );
-          }}
-        />
+        {resultSet && (
+          <Virtuoso
+            ref={ref}
+            totalCount={resultSet.entryCount}
+            overscan={{ main: VIRTUOSO_OVERSCAN, reverse: VIRTUOSO_OVERSCAN }}
+            itemContent={(entryIndex) => {
+              return (
+                <RowContents
+                  index={entryIndex}
+                  resultSet={resultSet}
+                  query={query}
+                  numberWidth={numberWidth}
+                  timestampWidth={timestampWidth}
+                  unitWidth={unitWidth}
+                  syslogIDWidth={syslogIDWidth}
+                />
+              );
+            }}
+          />
+        )}
       </ResizableTable.Body>
     </ResizableTable.Table>
   );
@@ -96,28 +95,48 @@ export function LogView({
 
 function RowContents({
   index,
-  logIndex,
+  resultSet,
   query,
   numberWidth,
   timestampWidth,
   unitWidth,
   syslogIDWidth,
-  isSelected,
 }: {
   index: number;
-  logIndex: LogIndex;
+  resultSet: ResultSet;
   query: string;
   numberWidth: number;
   timestampWidth: number;
   unitWidth: number;
   syslogIDWidth: number;
-  isSelected: boolean;
 }): React.JSX.Element {
-  // Ideally, this call to get entry data would be async, and we would initially show a loading
-  // placeholder. That would let logIndex avoid having to buffer all the data in memory up-front.
-  // Unfortunately, React Virtuoso has a lot of trouble with elements changing height as you
-  // scroll upward. So this needs to be instant to avoid things jumping around.
-  const rowData = logIndex.getEntry(index);
+  const [rowData, setRowData] = React.useState<LogEntry | null>(null);
+
+  React.useEffect(() => {
+    let ignore = false;
+    setRowData(null);
+    const load = async () => {
+      const entries = await resultSet.getEntries(index, index + 1);
+      if (!ignore) setRowData(entries[0] ?? null);
+    };
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
+    load();
+    return () => {
+      ignore = true;
+    };
+  }, [resultSet, index]);
+
+  if (rowData === null) {
+    return (
+      <ResizableTable.Row className="">
+        <ResizableTable.BodyGutterCell width={numberWidth} />
+        <ResizableTable.BodyGutterCell width={timestampWidth} />
+        <ResizableTable.BodyGutterCell title="" width={unitWidth} />
+        <ResizableTable.BodyGutterCell title="" width={syslogIDWidth} />
+        <ResizableTable.BodyMainCell>loading...</ResizableTable.BodyMainCell>
+      </ResizableTable.Row>
+    );
+  }
 
   const priorityClass = [
     "log-emerg",
@@ -133,10 +152,10 @@ function RowContents({
     <ResizableTable.Row className={priorityClass}>
       {/*TODO: align-right somehow.*/}
       <ResizableTable.BodyGutterCell
-        title={(index + 1).toString()}
+        title={(rowData.entryNumber + 1).toString()}
         width={numberWidth}
       >
-        {(index + 1).toString()}
+        {(rowData.entryNumber + 1).toString()}
       </ResizableTable.BodyGutterCell>
       <ResizableTable.BodyGutterCell width={timestampWidth}>
         <Datetime date={rowData.timestamp} />
@@ -152,11 +171,7 @@ function RowContents({
       </ResizableTable.BodyGutterCell>
       {/*TODO: Investigate whether it would be more semantic for this to have a <pre> tag.*/}
       <ResizableTable.BodyMainCell>
-        <MarkedText
-          text={rowData.message}
-          query={query}
-          isActive={isSelected}
-        />
+        <MarkedText text={rowData.message} query={query} />
       </ResizableTable.BodyMainCell>
     </ResizableTable.Row>
   );
