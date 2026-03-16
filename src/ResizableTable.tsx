@@ -1,9 +1,8 @@
 import {
-  type ForwardedRef,
   type JSX,
   type PropsWithChildren,
   type ReactNode,
-  forwardRef,
+  type Ref,
   useLayoutEffect,
   useRef,
   useState,
@@ -12,47 +11,53 @@ import { useMove } from "react-aria";
 
 import "./ResizableTable.css";
 
-export const Table = forwardRef(function Table(
+export function Table(
   props: PropsWithChildren<{
     wrapLines: boolean;
+    ref?: Ref<HTMLTableElement>;
   }>,
-  ref: ForwardedRef<HTMLTableElement>,
 ): JSX.Element {
+  const { ref, wrapLines, children } = props;
   return (
-    <table className={props.wrapLines ? "wrapLines" : "noWrapLines"} ref={ref}>
-      {props.children}
+    <table className={wrapLines ? "wrapLines" : "noWrapLines"} ref={ref}>
+      {children}
     </table>
   );
-});
+}
 
-export const Header = forwardRef(function Header(
-  { children }: { children: ReactNode },
-  ref: ForwardedRef<HTMLTableSectionElement>,
-): JSX.Element {
+export function Header(props: {
+  children: ReactNode;
+  ref?: Ref<HTMLTableSectionElement>;
+}): JSX.Element {
+  const { ref, children } = props;
   return (
     <thead ref={ref}>
       <tr>{children}</tr>
     </thead>
   );
-});
+}
 
-export const Body = forwardRef(function Body(
-  { children }: { children: ReactNode },
-  ref: ForwardedRef<HTMLTableSectionElement>,
-): JSX.Element {
+export function Body(props: {
+  children: ReactNode;
+  ref?: Ref<HTMLTableSectionElement>;
+}): JSX.Element {
+  const { ref, children } = props;
   return <tbody ref={ref}>{children}</tbody>;
-});
+}
 
-export const Row = forwardRef(function Row(
-  props: PropsWithChildren<{ className: string }>,
-  ref: ForwardedRef<HTMLTableRowElement>,
+export function Row(
+  props: PropsWithChildren<{
+    className: string;
+    ref?: Ref<HTMLTableRowElement>;
+  }>,
 ): JSX.Element {
+  const { ref, className, children } = props;
   return (
-    <tr ref={ref} className={props.className}>
-      {props.children}
+    <tr ref={ref} className={className}>
+      {children}
     </tr>
   );
-});
+}
 
 export function HeaderGutterCell({
   text,

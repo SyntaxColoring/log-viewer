@@ -1,4 +1,4 @@
-import React from "react";
+import React, { type Ref } from "react";
 import { Virtuoso, type VirtuosoHandle } from "react-virtuoso";
 
 import { type IndexState } from "./App";
@@ -11,90 +11,88 @@ import "./LogView.css";
 
 const VIRTUOSO_OVERSCAN = 1000;
 
-export const LogView = React.forwardRef(
-  (
-    {
-      file,
-      indexState,
-      query,
-      selectedRow,
-      wrapLines,
-    }: {
-      file: File | null;
-      indexState: IndexState;
-      query: string;
-      selectedRow: number | null;
-      wrapLines: boolean;
-    },
-    ref: React.ForwardedRef<VirtuosoHandle>,
-  ): React.JSX.Element => {
-    const [numberWidth, setNumberWidth] = React.useState(0);
-    const [timestampWidth, setTimestampWidth] = React.useState(0);
-    const [unitWidth, setUnitWidth] = React.useState(0);
-    const [syslogIDWidth, setSyslogIDWidth] = React.useState(0);
+export type LogViewProps = {
+  file: File | null;
+  indexState: IndexState;
+  query: string;
+  selectedRow: number | null;
+  wrapLines: boolean;
+  ref?: Ref<VirtuosoHandle>;
+};
 
-    // TODO: These probably need to set the ref?
-    // Can a React ref be present sometimes but not other times?
-    if (!file) return <></>;
-    else if (indexState.status !== "indexed") {
-      return (
-        <>
-          <p>Loading...</p>
-          <meter value={indexState.progress}></meter>
-        </>
-      );
-    } else {
-      return (
-        <ResizableTable.Table wrapLines={wrapLines}>
-          <ResizableTable.Header>
-            <ResizableTable.HeaderGutterCell
-              text="#"
-              defaultWidthCh={5}
-              onResize={setNumberWidth}
-            />
-            <ResizableTable.HeaderGutterCell
-              text="Timestamp"
-              defaultWidthCh={16}
-              onResize={setTimestampWidth}
-            />
-            <ResizableTable.HeaderGutterCell
-              text="Unit"
-              defaultWidthCh={16}
-              onResize={setUnitWidth}
-            />
-            <ResizableTable.HeaderGutterCell
-              text="Syslog ID"
-              defaultWidthCh={16}
-              onResize={setSyslogIDWidth}
-            />
-            <ResizableTable.HeaderMainCell text="Message" />
-          </ResizableTable.Header>
-          <ResizableTable.Body>
-            <Virtuoso
-              ref={ref}
-              totalCount={indexState.index.entryCount}
-              overscan={{ main: VIRTUOSO_OVERSCAN, reverse: VIRTUOSO_OVERSCAN }}
-              itemContent={(entryNumber) => {
-                return (
-                  <RowContents
-                    index={entryNumber}
-                    logIndex={indexState.index}
-                    query={query}
-                    numberWidth={numberWidth}
-                    timestampWidth={timestampWidth}
-                    unitWidth={unitWidth}
-                    syslogIDWidth={syslogIDWidth}
-                    isSelected={entryNumber === selectedRow}
-                  />
-                );
-              }}
-            />
-          </ResizableTable.Body>
-        </ResizableTable.Table>
-      );
-    }
-  },
-);
+export function LogView({
+  file,
+  indexState,
+  query,
+  ref,
+  selectedRow,
+  wrapLines,
+}: LogViewProps): React.JSX.Element {
+  const [numberWidth, setNumberWidth] = React.useState(0);
+  const [timestampWidth, setTimestampWidth] = React.useState(0);
+  const [unitWidth, setUnitWidth] = React.useState(0);
+  const [syslogIDWidth, setSyslogIDWidth] = React.useState(0);
+
+  // TODO: These probably need to set the ref?
+  // Can a React ref be present sometimes but not other times?
+  if (!file) return <></>;
+  if (indexState.status !== "indexed") {
+    return (
+      <>
+        <p>Loading...</p>
+        <meter value={indexState.progress}></meter>
+      </>
+    );
+  }
+  return (
+    <ResizableTable.Table wrapLines={wrapLines}>
+      <ResizableTable.Header>
+        <ResizableTable.HeaderGutterCell
+          text="#"
+          defaultWidthCh={5}
+          onResize={setNumberWidth}
+        />
+        <ResizableTable.HeaderGutterCell
+          text="Timestamp"
+          defaultWidthCh={16}
+          onResize={setTimestampWidth}
+        />
+        <ResizableTable.HeaderGutterCell
+          text="Unit"
+          defaultWidthCh={16}
+          onResize={setUnitWidth}
+        />
+        <ResizableTable.HeaderGutterCell
+          text="Syslog ID"
+          defaultWidthCh={16}
+          onResize={setSyslogIDWidth}
+        />
+        <ResizableTable.HeaderMainCell text="Message" />
+      </ResizableTable.Header>
+      <ResizableTable.Body>
+        <Virtuoso
+          ref={ref}
+          totalCount={indexState.index.entryCount}
+          overscan={{ main: VIRTUOSO_OVERSCAN, reverse: VIRTUOSO_OVERSCAN }}
+          itemContent={(entryNumber) => {
+            return (
+              <RowContents
+                index={entryNumber}
+                logIndex={indexState.index}
+                query={query}
+                numberWidth={numberWidth}
+                timestampWidth={timestampWidth}
+                unitWidth={unitWidth}
+                syslogIDWidth={syslogIDWidth}
+                isSelected={entryNumber === selectedRow}
+              />
+            );
+          }}
+        />
+      </ResizableTable.Body>
+    </ResizableTable.Table>
+  );
+}
 
 function RowContents({
   index,
