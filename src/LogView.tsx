@@ -73,6 +73,9 @@ export function LogView({
             ref={ref}
             totalCount={resultSet.entryCount}
             overscan={{ main: VIRTUOSO_OVERSCAN, reverse: VIRTUOSO_OVERSCAN }}
+            computeItemKey={(resultSetIndex) => {
+              return resultSet.entryNumbers[resultSetIndex] ?? resultSetIndex;
+            }}
             itemContent={(entryIndex) => {
               return (
                 <RowContents

@@ -31,6 +31,11 @@ export interface SearchParams {
 export interface ResultSet {
   /** The number of entries in this result set. */
   entryCount: number;
+  /**
+   * A mapping from result-set index -> underlying log-file entry index.
+   * This is exposed synchronously so it can be used for React keys.
+   */
+  entryNumbers: readonly number[];
   /** Get a range of entries [start, end) from this result set. */
   getEntries: (start: number, end: number) => Promise<LogEntry[]>;
 }
@@ -108,8 +113,12 @@ export async function buildLogSearcher(
     abortSignal?: AbortSignal,
   ): Promise<ResultSet> => {
     if (params.substring === null) {
+      const allEntryNumbers = Array(byteRanges.length)
+        .fill(0)
+        .map((_, i) => i);
       return {
         entryCount: byteRanges.length,
+        entryNumbers: allEntryNumbers,
         getEntries: async (start, end) => {
           const results: LogEntry[] = [];
           for (let i = start; i < end; i++) {
@@ -140,6 +149,7 @@ export async function buildLogSearcher(
 
     return {
       entryCount: matchingEntryNumbers.length,
+      entryNumbers: matchingEntryNumbers,
       getEntries: async (start, end) => {
         const results: LogEntry[] = [];
         for (let i = start; i < end; i++) {
