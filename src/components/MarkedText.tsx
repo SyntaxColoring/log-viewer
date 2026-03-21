@@ -1,4 +1,4 @@
-import { type JSX } from "react";
+import { Fragment, type JSX } from "react";
 
 import { findAllMatches } from "../textSearch/query";
 
@@ -17,9 +17,11 @@ export default function MarkedText({
   const chunks = [...sliceChunks(text, query)];
   return (
     <>
-      {chunks.map(({ text, isMatch }) =>
-        isMatch ? <mark className={styles.mark}>{text}</mark> : text,
-      )}
+      {chunks.map(({ text, isMatch }, index) => (
+        <Fragment key={index}>
+          {isMatch ? <mark className={styles.mark}>{text}</mark> : text}
+        </Fragment>
+      ))}
     </>
   );
 }
