@@ -1,3 +1,4 @@
+import clsx from "clsx";
 import {
   type JSX,
   type PropsWithChildren,
@@ -20,9 +21,10 @@ export function Table(
   const { ref, wrapLines, children } = props;
   return (
     <table
-      className={`${styles.table} ${
-        wrapLines ? styles.wrapLines : styles.noWrapLines
-      }`}
+      className={clsx(
+        styles.table,
+        wrapLines ? styles.wrapLines : styles.noWrapLines,
+      )}
       ref={ref}
     >
       {children}
@@ -62,7 +64,7 @@ export function Row(
 ): JSX.Element {
   const { ref, className, children } = props;
   return (
-    <tr ref={ref} className={`${styles.tr} ${className}`}>
+    <tr ref={ref} className={clsx(styles.tr, className)}>
       {children}
     </tr>
   );
@@ -101,7 +103,7 @@ export function HeaderGutterCell({
 
   return (
     <th
-      className={`${styles.th} ${styles.gutter}`}
+      className={clsx(styles.th, styles.gutter)}
       ref={ref}
       style={{
         width: widthPx == null ? `${defaultWidthCh}ch` : widthPx,
@@ -131,7 +133,7 @@ export function BodyGutterCell(
 ): JSX.Element {
   return (
     <td
-      className={`${styles.td} ${styles.gutter}`}
+      className={clsx(styles.td, styles.gutter)}
       title={props.title}
       style={{ width: props.width }}
     >
@@ -141,7 +143,7 @@ export function BodyGutterCell(
 }
 
 export function BodyMainCell(props: PropsWithChildren): JSX.Element {
-  return <td className={`${styles.td} ${styles.main}`}>{props.children}</td>;
+  return <td className={clsx(styles.td, styles.main)}>{props.children}</td>;
 }
 
 function Resizer({
