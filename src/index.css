@@ -1,9 +1,3 @@
-pre {
-  /* Default is 8 on Chrome, which is a bit excessive. */
-  tab-size: 4;
-  margin: 0;
-}
-
 body {
   margin: 0;
   padding: 0;
