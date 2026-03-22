@@ -1,10 +1,10 @@
 /* Reset all the table tags so they're laid out as normal containers. */
-table,
-thead,
-tbody,
-tr,
-td,
-th {
+.table,
+.thead,
+.tbody,
+.tr,
+.td,
+.th {
   /* TODO: the trs are somehow bigger than the tbody and thead containing them.
   The visual layout seems fine, but will that complicate efforts to get the current table size? */
   display: block;
@@ -13,27 +13,27 @@ th {
   padding: 0;
 }
 
-table {
+.table {
   display: flex;
   flex-direction: column;
   height: 100%;
 }
 
-tbody {
+.tbody {
   flex-grow: 1;
 }
 
-tr {
+.tr {
   display: flex;
 }
-table.noWrapLines tr {
+.table.noWrapLines .tr {
   /*
   When line wrapping is disabled, the scrollable width is totally driven by the
   width of the content and the user-defined column widths, independent of the container.
   */
   width: max-content;
 }
-table.wrapLines tr {
+.table.wrapLines .tr {
   /*
   When line wrapping is enabled, the scrollable width is whatever the container provides.
   The content will have to wrap in order to fit inside that.
@@ -50,56 +50,56 @@ table.wrapLines tr {
   min-width: min-content;
 }
 
-th,
-td.gutter,
-table.noWrapLines td.main {
+.th,
+.td.gutter,
+.table.noWrapLines .td.main {
   flex-shrink: 0;
   flex-grow: 0;
 }
-table.wrapLines td.main {
+.table.wrapLines .td.main {
   flex-grow: 1;
   flex-shrink: 1;
 }
 
-th,
-td {
+.th,
+.td {
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-th,
-td.gutter {
+.th,
+.td.gutter {
   white-space: nowrap;
 }
 
-table.noWrapLines td.main {
+.table.noWrapLines .td.main {
   white-space: pre;
 }
 
-table.wrapLines td.main {
+.table.wrapLines .td.main {
   white-space: break-spaces;
   overflow-wrap: anywhere;
 }
 
-td,
-th {
+.td,
+.th {
   /* TODO: If the width is manually dragged below this,
   it can break the 1:1 cursor drag relationship the next time you try to scale it back up. */
   min-width: 20px;
 }
 
-th,
-td {
+.td,
+.th {
   text-align: left;
   vertical-align: top;
 }
 
-td:not(:last-child),
-th:not(:last-child) {
+.td:not(:last-child),
+.th:not(:last-child) {
   padding-right: var(--space-2);
 }
 
-th {
+.th {
   position: relative;
 }
 
@@ -119,13 +119,13 @@ There's always the potential for this being required, even when line wrapping is
 because the data column has a minimum size and the user might have manually scaled the
 gutter columns to be quite wide.
 */
-table {
+.table {
   overflow-x: auto;
 }
 
 /* TODO: This responsibility belongs to the caller of ResizableTable,
 not ResizableTable itself. */
-td.main {
+.td.main {
   /* TODO: This looks gigantic next to normal text.
   Investigate how to properly size it to match. */
   font-family: var(--code-font-family);

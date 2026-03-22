@@ -7,7 +7,7 @@ import { Datetime } from "./components/Datetime";
 import MarkedText from "./components/MarkedText";
 import { type LogEntry, type ResultSet } from "./logAccess";
 
-import "./LogView.css";
+import styles from "./LogView.module.css";
 
 const VIRTUOSO_OVERSCAN = 1000;
 
@@ -142,14 +142,14 @@ function RowContents({
   }
 
   const priorityClass = [
-    "log-emerg",
-    "log-alert",
-    "log-crit",
-    "log-err",
-    "log-warning",
-    "log-notice",
-    "log-info",
-    "log-debug",
+    styles.logEmerg,
+    styles.logAlert,
+    styles.logCrit,
+    styles.logErr,
+    styles.logWarning,
+    styles.logNotice,
+    styles.logInfo,
+    styles.logDebug,
   ][rowData.priority];
   return (
     <ResizableTable.Row className={priorityClass}>

@@ -1,8 +1,8 @@
+import { type JSX } from "react";
+
 import { findAllMatches } from "../textSearch/query";
 
-import "./MarkedText.css";
-
-import { type JSX } from "react";
+import styles from "./MarkedText.module.css";
 
 /**
  * Renders the bare `text`, with the matching parts wrapped in `<mark>`.
@@ -18,7 +18,7 @@ export default function MarkedText({
   return (
     <>
       {chunks.map(({ text, isMatch }) =>
-        isMatch ? <mark className="mark">{text}</mark> : text,
+        isMatch ? <mark className={styles.mark}>{text}</mark> : text,
       )}
     </>
   );

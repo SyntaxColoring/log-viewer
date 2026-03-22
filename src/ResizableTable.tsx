@@ -9,7 +9,7 @@ import {
 } from "react";
 import { useMove } from "react-aria";
 
-import "./ResizableTable.css";
+import styles from "./ResizableTable.module.css";
 
 export function Table(
   props: PropsWithChildren<{
@@ -19,7 +19,12 @@ export function Table(
 ): JSX.Element {
   const { ref, wrapLines, children } = props;
   return (
-    <table className={wrapLines ? "wrapLines" : "noWrapLines"} ref={ref}>
+    <table
+      className={`${styles.table} ${
+        wrapLines ? styles.wrapLines : styles.noWrapLines
+      }`}
+      ref={ref}
+    >
       {children}
     </table>
   );
@@ -31,8 +36,8 @@ export function Header(props: {
 }): JSX.Element {
   const { ref, children } = props;
   return (
-    <thead ref={ref}>
-      <tr>{children}</tr>
+    <thead ref={ref} className={styles.thead}>
+      <tr className={styles.tr}>{children}</tr>
     </thead>
   );
 }
@@ -42,7 +47,11 @@ export function Body(props: {
   ref?: Ref<HTMLTableSectionElement>;
 }): JSX.Element {
   const { ref, children } = props;
-  return <tbody ref={ref}>{children}</tbody>;
+  return (
+    <tbody ref={ref} className={styles.tbody}>
+      {children}
+    </tbody>
+  );
 }
 
 export function Row(
@@ -53,7 +62,7 @@ export function Row(
 ): JSX.Element {
   const { ref, className, children } = props;
   return (
-    <tr ref={ref} className={className}>
+    <tr ref={ref} className={`${styles.tr} ${className}`}>
       {children}
     </tr>
   );
@@ -92,7 +101,7 @@ export function HeaderGutterCell({
 
   return (
     <th
-      className="gutter"
+      className={`${styles.th} ${styles.gutter}`}
       ref={ref}
       style={{
         width: widthPx == null ? `${defaultWidthCh}ch` : widthPx,
@@ -108,7 +117,7 @@ export function HeaderGutterCell({
 export function HeaderMainCell({ text }: { text: string }): JSX.Element {
   const ref = useRef<HTMLTableCellElement>(null);
   return (
-    <th title={text} ref={ref}>
+    <th className={styles.th} title={text} ref={ref}>
       {text}
     </th>
   );
@@ -121,14 +130,18 @@ export function BodyGutterCell(
   }>,
 ): JSX.Element {
   return (
-    <td className="gutter" title={props.title} style={{ width: props.width }}>
+    <td
+      className={`${styles.td} ${styles.gutter}`}
+      title={props.title}
+      style={{ width: props.width }}
+    >
       {props.children}
     </td>
   );
 }
 
 export function BodyMainCell(props: PropsWithChildren): JSX.Element {
-  return <td className="main">{props.children}</td>;
+  return <td className={`${styles.td} ${styles.main}`}>{props.children}</td>;
 }
 
 function Resizer({
@@ -137,5 +150,7 @@ function Resizer({
   onDrag: (dragAmount: number) => void;
 }): JSX.Element {
   const moveResult = useMove({ onMove: (event) => onDrag(event.deltaX) });
-  return <div className="resizer" tabIndex={0} {...moveResult.moveProps} />;
+  return (
+    <div className={styles.resizer} tabIndex={0} {...moveResult.moveProps} />
+  );
 }

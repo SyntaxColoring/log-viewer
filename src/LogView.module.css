@@ -1,19 +1,19 @@
-.log-debug {
+.logDebug {
   color: #666;
 }
 
-.log-info,
-.log-notice {
+.logInfo,
+.logNotice {
   /* Use the default styling. */
 }
 
-.log-warning {
+.logWarning {
   background-color: var(--yellow-3);
 }
 
-.log-err,
-.log-crit,
-.log-alert,
-.log-emerg {
+.logErr,
+.logCrit,
+.logAlert,
+.logEmerg {
   background-color: var(--red-3);
 }

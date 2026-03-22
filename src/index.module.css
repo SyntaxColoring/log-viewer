@@ -1,0 +1,8 @@
+:global(html),
+:global(body),
+:global(#root),
+.fullSize {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
