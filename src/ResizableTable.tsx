@@ -83,11 +83,12 @@ export function HeaderGutterCell({
   const [widthPx, setWidthPx] = useState<number | null>(null);
 
   const handleResizerDrag = (dragAmount: number) => {
-    if (widthPx != null) {
-      const newWidth = widthPx + dragAmount;
-      setWidthPx(newWidth);
+    setWidthPx((oldWidthPx) => {
+      if (oldWidthPx == null) return null;
+      const newWidth = oldWidthPx + dragAmount;
       onResize(newWidth);
-    }
+      return newWidth;
+    });
   };
 
   useLayoutEffect(() => {
