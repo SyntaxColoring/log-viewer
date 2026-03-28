@@ -1,19 +1,70 @@
-import { Box, Flex, Switch, Text } from "@radix-ui/themes";
+import { Box, Flex } from "@radix-ui/themes";
 import React from "react";
-import { type VirtuosoHandle } from "react-virtuoso";
 
 import { type JSX } from "react";
-import { LogView } from "./LogView";
-import { ResourceMonitor } from "./ResourceMonitor";
+import { Group, Panel } from "react-resizable-panels";
+import styles from "./App.module.css";
+import { Datetime } from "./components/Datetime";
+import { FieldList } from "./components/FieldList";
+import MarkedText from "./components/MarkedText";
+import { ResizablePanelSeparator } from "./components/ResizablePanelSeparator";
 import {
   SearchBar,
   type Props as SearchBarProps,
 } from "./components/SearchBar";
 import {
+  type LogEntry,
   type LogSearcher,
   type ResultSet,
   buildLogSearcher,
 } from "./logAccess";
+import { LogView, type LogViewColumn } from "./LogView";
+import { ResourceMonitor } from "./ResourceMonitor";
+
+const MIN_PANEL_SIZE = 50;
+const LOG_VIEW_COLUMNS: LogViewColumn[] = [
+  {
+    field: "entryNumber",
+    header: "#",
+    render: ({ entry }) => (
+      <span title={String(entry.entryNumber + 1)}>{entry.entryNumber + 1}</span>
+    ),
+  },
+  {
+    field: "timestamp",
+    header: "Timestamp",
+    render: ({ entry }) => (
+      <span title={entry.timestamp.toISOString()}>
+        <Datetime date={entry.timestamp} />
+      </span>
+    ),
+  },
+  {
+    field: "unit",
+    header: "Unit",
+    render: ({ entry }) => (
+      <span title={entry.unit ?? ""}>{entry.unit ?? ""}</span>
+    ),
+  },
+  {
+    field: "syslogIdentifier",
+    header: "Syslog ID",
+    render: ({ entry }) => (
+      <span title={entry.syslogIdentifier ?? ""}>
+        {entry.syslogIdentifier ?? ""}
+      </span>
+    ),
+  },
+  {
+    field: "message",
+    header: "Message",
+    render: ({ entry, query }) => (
+      <span title={entry.message}>
+        <MarkedText text={entry.message} query={query ?? ""} />
+      </span>
+    ),
+  },
+];
 
 function FilePicker({
   setFile,
@@ -36,16 +87,16 @@ function FilePicker({
   );
 }
 
-function App() {
-  const virtuosoRef = React.useRef<VirtuosoHandle>(null);
-
+export default function App() {
   const [file, setFile] = React.useState(null as File | null);
   const searcherState = useSearcherState(file);
 
-  const [wrapLines, setWrapLines] = React.useState(true);
-
   const [searchQuery, setSearchQuery] = React.useState("");
   const searchResult = useSearch(searcherState, searchQuery);
+  const [selectedEntryNumber, setSelectedEntryNumber] = React.useState<
+    number | null
+  >(null);
+  const selectedEntry = useSelectedEntry(searcherState, selectedEntryNumber);
 
   const searchBarProps: SearchBarProps = {
     query: searchQuery,
@@ -68,33 +119,76 @@ function App() {
   };
 
   return (
-    <Flex direction="column" style={{ height: "100%" }}>
-      <ResourceMonitor />
-      <FilePicker setFile={setFile} />
-      <SearchBar {...searchBarProps} />
-      <Flex gap="2">
-        <Text as="label">
-          <Switch checked={wrapLines} onCheckedChange={setWrapLines} />
-          Wrap lines
-        </Text>
-      </Flex>
-      <Box flexGrow="1">
-        <LogView
-          file={file}
-          searcherState={searcherState}
-          resultSet={
-            searchResult.state === "complete" ? searchResult.resultSet : null
-          }
-          ref={virtuosoRef}
-          query={searchQuery}
-          wrapLines={wrapLines}
+    <Group orientation="vertical">
+      <div>
+        <ResourceMonitor />
+        <FilePicker
+          setFile={(nextFile) => {
+            setSelectedEntryNumber(null);
+            setFile(nextFile);
+          }}
         />
-      </Box>
-    </Flex>
+        {searcherState.status === "indexing" && (
+          <FileUploadProgress progress={searcherState.progress} />
+        )}
+        <SearchBar {...searchBarProps} />
+      </div>
+      <Panel minSize={MIN_PANEL_SIZE}>
+        <Flex direction="column" style={{ height: "100%" }}>
+          <Box flexGrow="1">
+            {searcherState.status === "indexed" && (
+              <LogView
+                entryNumbers={
+                  searchResult.state === "complete"
+                    ? searchResult.resultSet.entryNumbers
+                    : []
+                }
+                selectedEntryNumber={selectedEntryNumber}
+                onSelectedEntryNumberChange={setSelectedEntryNumber}
+                logSearcher={searcherState.searcher}
+                columns={LOG_VIEW_COLUMNS}
+                query={searchQuery}
+              />
+            )}
+          </Box>
+        </Flex>
+      </Panel>
+      <ResizablePanelSeparator orientation="vertical" />
+      <Panel minSize={MIN_PANEL_SIZE}>
+        {selectedEntryNumber === null ? (
+          "Select a log entry to view its details."
+        ) : selectedEntry === null ? (
+          "Loading selected entry..."
+        ) : (
+          <>
+            <pre className={styles.selectedMessage}>
+              <MarkedText text={selectedEntry.message} query={searchQuery} />
+            </pre>
+            <FieldList
+              data={formatSelectedEntryForFieldList(selectedEntry, ["message"])}
+            />
+          </>
+        )}
+      </Panel>
+    </Group>
   );
 }
 
-export type SearcherState =
+function FileUploadProgress({ progress }: { progress: number }): JSX.Element {
+  const percent = Math.round(progress * 100);
+  return (
+    <label>
+      Importing: {percent}%
+      <progress
+        max={100}
+        value={percent}
+        className={styles.importProgressBar}
+      />
+    </label>
+  );
+}
+
+type SearcherState =
   | { status: "noFile" }
   | { status: "indexed"; searcher: LogSearcher }
   | { status: "indexing"; progress: number };
@@ -186,4 +280,49 @@ function debounceProgress(
   };
 }
 
-export default App;
+function useSelectedEntry(
+  searcherState: SearcherState,
+  selectedEntryNumber: number | null,
+): LogEntry | null {
+  const [selectedEntry, setSelectedEntry] = React.useState<LogEntry | null>(
+    null,
+  );
+
+  React.useEffect(() => {
+    let ignore = false;
+    if (searcherState.status !== "indexed" || selectedEntryNumber === null) {
+      setSelectedEntry(null);
+      return;
+    }
+
+    setSelectedEntry(null);
+    const load = async () => {
+      const entries = await searcherState.searcher.getEntries([
+        selectedEntryNumber,
+      ]);
+      if (!ignore) setSelectedEntry(entries[0] ?? null);
+    };
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
+    load();
+
+    return () => {
+      ignore = true;
+    };
+  }, [searcherState, selectedEntryNumber]);
+
+  return selectedEntry;
+}
+
+function formatSelectedEntryForFieldList(
+  entry: LogEntry,
+  keysToExclude: string[] = [],
+): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(entry)
+      .filter(([key]) => !keysToExclude.includes(key))
+      .map(([key, value]) => [
+        key,
+        value instanceof Date ? value.toISOString() : String(value),
+      ]),
+  );
+}

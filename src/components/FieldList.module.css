@@ -1,0 +1,24 @@
+.list {
+  columns: 40ch auto;
+  column-fill: balance;
+  gap: 3ch;
+  column-rule: 1px solid #ddd;
+}
+
+.listItem {
+  break-inside: avoid;
+  margin-block-end: 2ch;
+}
+
+.term {
+  font-weight: 600;
+}
+
+.definition {
+  margin-inline-start: 1rem;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  overflow: hidden;
+}

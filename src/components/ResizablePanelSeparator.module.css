@@ -1,0 +1,12 @@
+.separator {
+  border-radius: 4px;
+  background-color: #ddd;
+}
+
+.resizeVertically {
+  height: 8px;
+}
+
+.resizeHorizontally {
+  width: 8px;
+}

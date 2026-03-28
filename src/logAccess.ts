@@ -17,6 +17,7 @@ export interface LogSearcher {
     params: SearchParams,
     abortSignal?: AbortSignal,
   ) => Promise<ResultSet>;
+  getEntries: (entryNumbers: number[]) => Promise<LogEntry[]>;
 }
 
 export interface SearchParams {
@@ -35,7 +36,7 @@ export interface ResultSet {
    * A mapping from result-set index -> underlying log-file entry index.
    * This is exposed synchronously so it can be used for React keys.
    */
-  entryNumbers: readonly number[];
+  entryNumbers: number[];
   /** Get a range of entries [start, end) from this result set. */
   getEntries: (start: number, end: number) => Promise<LogEntry[]>;
 }
@@ -83,6 +84,10 @@ export async function buildLogSearcher(
     }
   }
 
+  console.log(
+    `Done reading ${byteRanges.length} entries from ${file.size} bytes.`,
+  );
+
   const getEntry = async (entryNumber: number): Promise<LogEntry> => {
     const byteRangeForEntry = byteRanges[entryNumber];
     const byteStreamForEntry = file.slice(
@@ -104,9 +109,13 @@ export async function buildLogSearcher(
     return { entryNumber, ...parsed };
   };
 
-  console.log(
-    `Done reading ${byteRanges.length} entries from ${file.size} bytes.`,
-  );
+  const getEntries = async (entryNumbers: number[]): Promise<LogEntry[]> => {
+    const result: LogEntry[] = [];
+    for (const entryNumber of entryNumbers) {
+      result.push(await getEntry(entryNumber));
+    }
+    return result;
+  };
 
   const search = async (
     params: SearchParams,
@@ -165,6 +174,7 @@ export async function buildLogSearcher(
   return {
     entryCount: byteRanges.length,
     search,
+    getEntries,
   };
 }
 

@@ -1,19 +1,87 @@
-.logDebug {
+.logView {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow-x: auto;
+}
+
+.thead {
+  flex: none;
+}
+
+.tbody {
+  flex: auto;
+}
+
+.th.resizable {
+  position: relative;
+}
+
+.resizer {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  width: 4px;
+  cursor: col-resize;
+  background-color: blue;
+}
+
+.tr {
+  display: grid;
+  /* grid-template-columns is set by JS. */
+}
+
+.tbody .tr {
+  cursor: default;
+}
+
+.tbody .tr:not(.selected):hover {
+  background-color: var(--gray-3);
+}
+
+.selected {
+  /* Keep priority background colors, and layer selection on top. */
+  box-shadow: inset 0 0 0 2px var(--blue-8);
+}
+
+.spanAllColumns {
+  grid-column: 1 / -1;
+}
+
+.td:not(:last-child),
+.th:not(:last-child) {
+  padding-right: var(--space-2);
+}
+
+.ellipsize {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mono {
+  /* TODO: This looks gigantic next to normal text.
+  Investigate how to properly size it to match. */
+  font-family: var(--code-font-family);
+}
+
+.priorityDebug {
   color: #666;
 }
 
-.logInfo,
-.logNotice {
+.priorityInfo,
+.priorityNotice {
   /* Use the default styling. */
 }
 
-.logWarning {
+.priorityWarning {
   background-color: var(--yellow-3);
 }
 
-.logErr,
-.logCrit,
-.logAlert,
-.logEmerg {
+.priorityErr,
+.priorityCrit,
+.priorityAlert,
+.priorityEmerg {
   background-color: var(--red-3);
 }
