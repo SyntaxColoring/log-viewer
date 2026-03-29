@@ -1,6 +1,12 @@
 import { MagnifyingGlassIcon } from "@radix-ui/react-icons";
 import { TextField } from "@radix-ui/themes";
-import { type JSX } from "react";
+import { useImperativeHandle, useRef, type JSX, type Ref } from "react";
+
+export interface SearchBarHandle {
+  focus: () => void;
+  select: () => void;
+  isFocused: () => boolean;
+}
 
 export type Status =
   | {
@@ -17,21 +23,43 @@ export type Status =
       matchCount: number;
     };
 
-export interface Props {
+export interface SearchBarProps {
   query: string;
   status: Status;
   onQueryChange: (newQuery: string) => void;
+  placeholder?: string;
+  ref?: Ref<SearchBarHandle>;
 }
 
 export function SearchBar({
   query,
   status,
   onQueryChange,
-}: Props): JSX.Element {
+  placeholder,
+  ref,
+}: SearchBarProps): JSX.Element {
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      focus: () => {
+        inputRef.current?.focus();
+      },
+      select: () => {
+        inputRef.current?.select();
+      },
+      isFocused: () => document.activeElement === inputRef.current,
+    }),
+    [],
+  );
+
   return (
     <TextField.Root
+      ref={inputRef}
+      type="search"
       size="3"
-      placeholder="Search messages..."
+      placeholder={placeholder}
       value={query}
       onChange={(event) => onQueryChange(event.target.value)}
     >

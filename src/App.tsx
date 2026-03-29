@@ -10,7 +10,8 @@ import MarkedText from "./components/MarkedText";
 import { ResizablePanelSeparator } from "./components/ResizablePanelSeparator";
 import {
   SearchBar,
-  type Props as SearchBarProps,
+  type SearchBarHandle,
+  type SearchBarProps,
 } from "./components/SearchBar";
 import {
   type LogEntry,
@@ -18,7 +19,7 @@ import {
   type ResultSet,
   buildLogSearcher,
 } from "./logAccess";
-import { LogView, type LogViewColumn } from "./LogView";
+import { LogView, type LogViewColumn, type LogViewHandle } from "./LogView";
 import { ResourceMonitor } from "./ResourceMonitor";
 
 const MIN_PANEL_SIZE = 50;
@@ -90,6 +91,12 @@ function FilePicker({
 export default function App() {
   const [file, setFile] = React.useState(null as File | null);
   const searcherState = useSearcherState(file);
+  const searchBarRef = React.useRef<SearchBarHandle>(null);
+  const logViewRef = React.useRef<LogViewHandle>(null);
+  const shortcutLabel = useSearchLogFocusToggleShortcut(
+    searchBarRef,
+    logViewRef,
+  );
 
   const [searchQuery, setSearchQuery] = React.useState("");
   const searchResult = useSearch(searcherState, searchQuery);
@@ -100,6 +107,7 @@ export default function App() {
 
   const searchBarProps: SearchBarProps = {
     query: searchQuery,
+    placeholder: `Search messages (${shortcutLabel})`,
     status:
       searchResult.state === "noSearch"
         ? { type: "noStatus" }
@@ -131,13 +139,14 @@ export default function App() {
         {searcherState.status === "indexing" && (
           <FileUploadProgress progress={searcherState.progress} />
         )}
-        <SearchBar {...searchBarProps} />
+        <SearchBar ref={searchBarRef} {...searchBarProps} />
       </div>
       <Panel minSize={MIN_PANEL_SIZE}>
         <Flex direction="column" style={{ height: "100%" }}>
           <Box flexGrow="1">
             {searcherState.status === "indexed" && (
               <LogView
+                ref={logViewRef}
                 entryNumbers={
                   searchResult.state === "complete"
                     ? searchResult.resultSet.entryNumbers
@@ -325,4 +334,45 @@ function formatSelectedEntryForFieldList(
         value instanceof Date ? value.toISOString() : String(value),
       ]),
   );
+}
+
+function useSearchLogFocusToggleShortcut(
+  searchBarRef: React.RefObject<SearchBarHandle | null>,
+  logViewRef: React.RefObject<LogViewHandle | null>,
+): string {
+  React.useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      const isToggleShortcut =
+        (event.ctrlKey || event.metaKey) &&
+        event.key.toLowerCase() === "k" &&
+        !event.altKey &&
+        !event.shiftKey &&
+        !event.isComposing;
+      if (!isToggleShortcut) return;
+
+      const searchBar = searchBarRef.current;
+      if (!searchBar) return;
+
+      if (searchBar.isFocused()) {
+        if (!logViewRef.current) return;
+        event.preventDefault();
+        logViewRef.current.focus();
+        return;
+      }
+
+      event.preventDefault();
+      searchBar.focus();
+      searchBar.select();
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [logViewRef, searchBarRef]);
+
+  return typeof navigator !== "undefined" &&
+    /(Mac|iPhone|iPad|iPod)/i.test(navigator.platform)
+    ? "⌘K"
+    : "Ctrl+K";
 }

@@ -5,11 +5,13 @@ import { type LogEntry, type LogSearcher } from "./logAccess";
 import clsx from "clsx";
 import {
   useCallback,
+  useImperativeHandle,
   useRef,
   useState,
   type CSSProperties,
   type JSX,
   type PropsWithChildren,
+  type Ref,
 } from "react";
 import { useMove } from "react-aria";
 
@@ -42,7 +44,13 @@ export type LogViewProps = {
   query: string | null;
   /** Which columns to display (in display order). */
   columns: LogViewColumn[];
+  ref?: Ref<LogViewHandle>;
 };
+
+export interface LogViewHandle {
+  focus: () => void;
+  isFocused: () => boolean;
+}
 
 export interface LogViewColumn {
   field: keyof LogEntry;
@@ -56,15 +64,27 @@ export interface LogViewColumnRenderContext {
   query: string | null;
 }
 
-export function LogView(props: LogViewProps): React.JSX.Element {
-  const {
-    entryNumbers,
-    selectedEntryNumber,
-    query,
-    columns,
-    logSearcher,
-    onSelectedEntryNumberChange,
-  } = props;
+export function LogView({
+  entryNumbers,
+  selectedEntryNumber,
+  query,
+  columns,
+  logSearcher,
+  onSelectedEntryNumberChange,
+  ref,
+}: LogViewProps): React.JSX.Element {
+  const tableBodyRef = useRef<HTMLDivElement>(null);
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      focus: () => {
+        tableBodyRef.current?.focus();
+      },
+      isFocused: () => document.activeElement === tableBodyRef.current,
+    }),
+    [],
+  );
 
   const { getColumnWidth, setColumnWidth } = useColumnWidths();
 
@@ -79,6 +99,7 @@ export function LogView(props: LogViewProps): React.JSX.Element {
     <div className={styles.logView} style={style}>
       <Header columns={columns} setColumnWidth={setColumnWidth} />
       <Body
+        tableBodyRef={tableBodyRef}
         entryNumbers={entryNumbers}
         selectedEntryNumber={selectedEntryNumber}
         logSearcher={logSearcher}
@@ -154,6 +175,7 @@ function Resizer({
 }
 
 interface BodyProps {
+  tableBodyRef: React.RefObject<HTMLDivElement | null>;
   entryNumbers: number[];
   selectedEntryNumber: number | null;
   logSearcher: LogSearcher;
@@ -165,6 +187,7 @@ interface BodyProps {
 
 function Body(props: BodyProps): JSX.Element {
   const {
+    tableBodyRef,
     entryNumbers,
     selectedEntryNumber,
     logSearcher,
@@ -220,7 +243,12 @@ function Body(props: BodyProps): JSX.Element {
   );
 
   return (
-    <div className={styles.tbody} tabIndex={0} onKeyDown={handleKeyDown}>
+    <div
+      ref={tableBodyRef}
+      className={styles.tbody}
+      tabIndex={0}
+      onKeyDown={handleKeyDown}
+    >
       <Virtuoso
         ref={virtuosoRef}
         scrollerRef={(scroller) => {
