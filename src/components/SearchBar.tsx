@@ -1,5 +1,9 @@
-import { MagnifyingGlassIcon } from "@radix-ui/react-icons";
-import { TextField } from "@radix-ui/themes";
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupInput,
+} from "@/shadcn/components/ui/input-group";
+import { Search } from "lucide-react";
 import { useImperativeHandle, useRef, type JSX, type Ref } from "react";
 
 export interface SearchBarHandle {
@@ -55,21 +59,21 @@ export function SearchBar({
   );
 
   return (
-    <TextField.Root
-      ref={inputRef}
-      type="search"
-      size="3"
-      placeholder={placeholder}
-      value={query}
-      onChange={(event) => onQueryChange(event.target.value)}
-    >
-      <TextField.Slot side="left">
-        <MagnifyingGlassIcon />
-      </TextField.Slot>
-      <TextField.Slot side="right">
+    <InputGroup>
+      <InputGroupAddon align="inline-start">
+        <Search aria-hidden className="size-3" />
+      </InputGroupAddon>
+      <InputGroupInput
+        ref={inputRef}
+        type="search"
+        placeholder={placeholder}
+        value={query}
+        onChange={(event) => onQueryChange(event.target.value)}
+      />
+      <InputGroupAddon align="inline-end">
         <StatusPart status={status} />
-      </TextField.Slot>
-    </TextField.Root>
+      </InputGroupAddon>
+    </InputGroup>
   );
 }
 
