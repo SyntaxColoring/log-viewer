@@ -3,7 +3,8 @@ import React, { type JSX } from "react";
 import { Group, Panel } from "react-resizable-panels";
 
 import { Button } from "@/shadcn/components/ui/button";
-import { type LogEntry, type LogSearcher, type ResultSet } from "../logAccess";
+import { type LogSearcher, type ResultSet } from "../logAccess";
+import { type LogEntry, UNDERLYING_RAW_FIELDS } from "../logEntry";
 import { Datetime } from "./Datetime";
 import { FieldList } from "./FieldList";
 import FileImportButton from "./FileImportButton";
@@ -25,25 +26,32 @@ const LOG_VIEW_COLUMNS: LogViewColumn[] = [
   {
     field: "timestamp",
     header: "Timestamp",
-    render: ({ entry }) => (
-      <span title={entry.timestamp.toISOString()}>
-        <Datetime date={entry.timestamp} />
-      </span>
-    ),
+    render: ({ entry }) => {
+      const timestamp = entry.validatedFields.timestamp;
+      return timestamp === null ? (
+        <span title="" />
+      ) : (
+        <span title={timestamp.toISOString()}>
+          <Datetime date={timestamp} />
+        </span>
+      );
+    },
   },
   {
     field: "unit",
     header: "Unit",
     render: ({ entry }) => (
-      <span title={entry.unit ?? ""}>{entry.unit ?? ""}</span>
+      <span title={entry.validatedFields.unit ?? ""}>
+        {entry.validatedFields.unit ?? ""}
+      </span>
     ),
   },
   {
     field: "syslogIdentifier",
     header: "Syslog ID",
     render: ({ entry }) => (
-      <span title={entry.syslogIdentifier ?? ""}>
-        {entry.syslogIdentifier ?? ""}
+      <span title={entry.validatedFields.syslogIdentifier ?? ""}>
+        {entry.validatedFields.syslogIdentifier ?? ""}
       </span>
     ),
   },
@@ -51,8 +59,11 @@ const LOG_VIEW_COLUMNS: LogViewColumn[] = [
     field: "message",
     header: "Message",
     render: ({ entry, query }) => (
-      <span title={entry.message}>
-        <MarkedText text={entry.message} query={query ?? ""} />
+      <span title={entry.validatedFields.message ?? ""}>
+        <MarkedText
+          text={entry.validatedFields.message ?? ""}
+          query={query ?? ""}
+        />
       </span>
     ),
   },
@@ -151,10 +162,15 @@ export function LogViewPage({
         ) : (
           <>
             <pre className="w-full overflow-x-auto">
-              <MarkedText text={selectedEntry.message} query={searchQuery} />
+              <MarkedText
+                text={selectedEntry.validatedFields.message ?? ""}
+                query={searchQuery}
+              />
             </pre>
             <FieldList
-              data={formatSelectedEntryForFieldList(selectedEntry, ["message"])}
+              data={formatSelectedEntryForFieldList(selectedEntry, [
+                UNDERLYING_RAW_FIELDS.message,
+              ])}
             />
           </>
         )}
@@ -273,13 +289,10 @@ function useSearchLogFocusToggleShortcut(
 function formatSelectedEntryForFieldList(
   entry: LogEntry,
   keysToExclude: string[] = [],
-): Record<string, string> {
-  return Object.fromEntries(
-    Object.entries(entry)
-      .filter(([key]) => !keysToExclude.includes(key))
-      .map(([key, value]) => [
-        key,
-        value instanceof Date ? value.toISOString() : String(value),
-      ]),
+): Map<string, string> {
+  return new Map(
+    Array.from(entry.rawFields.entries()).filter(
+      ([key]) => !keysToExclude.includes(key),
+    ),
   );
 }

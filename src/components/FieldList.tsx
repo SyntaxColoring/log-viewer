@@ -1,11 +1,13 @@
 import { type JSX } from "react";
 
 export interface FieldListProps {
-  data: Record<string, string>;
+  data: Map<string, string>;
 }
 
 export function FieldList({ data }: FieldListProps): JSX.Element {
-  const entries = Object.entries(data).sort((a, b) => a[0].localeCompare(b[0]));
+  const entries = Array.from(data.entries()).sort((a, b) =>
+    a[0].localeCompare(b[0]),
+  );
 
   return (
     <dl className="columns-[40ch_auto] gap-[3ch] [column-fill:balance] [column-rule:1px_solid_#ddd]">

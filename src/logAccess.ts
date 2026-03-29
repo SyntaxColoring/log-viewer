@@ -4,6 +4,11 @@ import chunks from "./journalParsing/chunks";
 import jsonRecordSplitter, {
   type ParsedJSON,
 } from "./journalParsing/jsonRecordSplitter";
+import {
+  BINARY_DATA_PLACEHOLDER,
+  getValidatedFields,
+  type LogEntry,
+} from "./logEntry";
 import { NgramIndex } from "./textSearch/ngramIndex";
 import { normalize } from "./textSearch/normalize";
 
@@ -41,15 +46,6 @@ export interface ResultSet {
   getEntries: (start: number, end: number) => Promise<LogEntry[]>;
 }
 
-export interface LogEntry {
-  entryNumber: number;
-  timestamp: Date;
-  priority: number;
-  unit: string;
-  syslogIdentifier: string;
-  message: string; // TODO: Handle binary data.
-}
-
 interface ByteRange {
   beginByteIndex: number;
   endByteIndex: number;
@@ -76,7 +72,10 @@ export async function buildLogSearcher(
       beginByteIndex: entry.beginByteIndex,
       endByteIndex: entry.endByteIndex,
     });
-    textSearchIndex.addDocument(newEntryNumber, normalize(parsedEntry.message));
+    textSearchIndex.addDocument(
+      newEntryNumber,
+      normalize(parsedEntry.validatedFields.message),
+    );
 
     if (newEntryNumber % 10000 === 0) {
       onProgress?.(entry.endByteIndex / file.size);
@@ -150,7 +149,11 @@ export async function buildLogSearcher(
       const candidateNumber = candidateEntryNumbers[i];
       const candidate = await getEntry(candidateNumber);
 
-      if (normalize(candidate.message).includes(normalize(params.substring)))
+      if (
+        normalize(candidate.validatedFields.message).includes(
+          normalize(params.substring),
+        )
+      )
         matchingEntryNumbers.push(candidateNumber);
     }
 
@@ -179,20 +182,30 @@ export async function buildLogSearcher(
 }
 
 function parseEntry(parsed: ParsedJSON): Omit<LogEntry, "entryNumber"> {
-  // TODO: We should probably validate this. The input file is untrusted.
-  const json = parsed.parsedJSON as {
-    __REALTIME_TIMESTAMP: string;
-    PRIORITY: string;
-    _SYSTEMD_UNIT: string;
-    SYSLOG_IDENTIFIER: string;
-    MESSAGE: string;
-  };
-  const epochMicroseconds = parseInt(json.__REALTIME_TIMESTAMP);
+  const rawFields = toRawFields(parsed.parsedJSON);
   return {
-    timestamp: new Date(epochMicroseconds / 1000),
-    priority: parseInt(json.PRIORITY),
-    unit: json._SYSTEMD_UNIT, // TODO: Also support _SYSTEMD_USER_UNIT?
-    syslogIdentifier: json.SYSLOG_IDENTIFIER,
-    message: json.MESSAGE,
+    rawFields,
+    validatedFields: getValidatedFields(rawFields),
   };
+}
+
+function toRawFields(parsedJSON: unknown): Map<string, string> {
+  if (
+    typeof parsedJSON !== "object" ||
+    parsedJSON === null ||
+    Array.isArray(parsedJSON)
+  ) {
+    return new Map();
+  }
+
+  const result = new Map<string, string>();
+  for (const [key, value] of Object.entries(parsedJSON)) {
+    if (typeof value === "string") {
+      result.set(key, value);
+    } else if (Array.isArray(value)) {
+      // journalctl encodes binary data as JSON arrays of numbers.
+      result.set(key, BINARY_DATA_PLACEHOLDER);
+    }
+  }
+  return result;
 }

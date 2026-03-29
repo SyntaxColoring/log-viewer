@@ -1,6 +1,7 @@
 import React from "react";
 
-import { type LogEntry, type LogSearcher } from "../logAccess";
+import { type LogEntry, type SyslogPriority } from "@/logEntry";
+import { type LogSearcher } from "../logAccess";
 
 import clsx from "clsx";
 import {
@@ -53,9 +54,9 @@ export interface LogViewHandle {
 }
 
 export interface LogViewColumn {
-  field: keyof LogEntry;
+  field: string;
   header: string;
-  render?: (context: LogViewColumnRenderContext) => React.ReactNode;
+  render: (context: LogViewColumnRenderContext) => JSX.Element;
 }
 
 export interface LogViewColumnRenderContext {
@@ -327,7 +328,7 @@ function EntryRow(props: EntryRowProps): JSX.Element {
 
 function LoadedEntry(props: LoadedEntryProps): JSX.Element {
   const { isSelected, query, data, columns, rowIndex, onClick } = props;
-  const priorityClass = getPriorityClass(data.priority);
+  const priorityClass = getPriorityClass(data.validatedFields.priority);
   return (
     // We're setting the column widths by CSS variable here instead of via CSS subgrid
     // because react-virtuoso makes it difficult to propagate subgrids all the way down
@@ -338,21 +339,17 @@ function LoadedEntry(props: LoadedEntryProps): JSX.Element {
       onClick={onClick}
     >
       {columns.map((column) => {
-        const value = data[column.field];
-        // TODO: Even special fields like _SYSTEMD_UNIT are apparently not always present.
-        // Our types and parsing code need to be updated to account for this, too.
-        const valueString = value === undefined ? "" : value.toString();
         const renderContext = { entry: data, rowIndex, query };
-        const renderedValue = column.render
-          ? column.render(renderContext)
-          : valueString;
-        return <BodyCell key={column.field}>{renderedValue}</BodyCell>;
+        return (
+          <BodyCell key={column.field}>{column.render(renderContext)}</BodyCell>
+        );
       })}
     </div>
   );
 }
 
-function getPriorityClass(priorityCode: number): string | undefined {
+function getPriorityClass(priorityCode: SyslogPriority | null): string {
+  if (priorityCode === null) return styles.priorityInfo;
   return [
     styles.priorityEmerg,
     styles.priorityAlert,
