@@ -1,7 +1,5 @@
-import { Box, Flex } from "@radix-ui/themes";
-import React from "react";
+import React, { type JSX } from "react";
 
-import { type JSX } from "react";
 import { Group, Panel } from "react-resizable-panels";
 import styles from "./App.module.css";
 import { Datetime } from "./components/Datetime";
@@ -142,25 +140,21 @@ export default function App() {
         <SearchBar ref={searchBarRef} {...searchBarProps} />
       </div>
       <Panel minSize={MIN_PANEL_SIZE}>
-        <Flex direction="column" style={{ height: "100%" }}>
-          <Box flexGrow="1">
-            {searcherState.status === "indexed" && (
-              <LogView
-                ref={logViewRef}
-                entryNumbers={
-                  searchResult.state === "complete"
-                    ? searchResult.resultSet.entryNumbers
-                    : []
-                }
-                selectedEntryNumber={selectedEntryNumber}
-                onSelectedEntryNumberChange={setSelectedEntryNumber}
-                logSearcher={searcherState.searcher}
-                columns={LOG_VIEW_COLUMNS}
-                query={searchQuery}
-              />
-            )}
-          </Box>
-        </Flex>
+        {searcherState.status === "indexed" && (
+          <LogView
+            ref={logViewRef}
+            entryNumbers={
+              searchResult.state === "complete"
+                ? searchResult.resultSet.entryNumbers
+                : []
+            }
+            selectedEntryNumber={selectedEntryNumber}
+            onSelectedEntryNumberChange={setSelectedEntryNumber}
+            logSearcher={searcherState.searcher}
+            columns={LOG_VIEW_COLUMNS}
+            query={searchQuery}
+          />
+        )}
       </Panel>
       <ResizablePanelSeparator orientation="vertical" />
       <Panel minSize={MIN_PANEL_SIZE}>
