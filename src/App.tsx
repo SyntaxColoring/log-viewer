@@ -18,7 +18,6 @@ import {
   buildLogSearcher,
 } from "./logAccess";
 import { LogView, type LogViewColumn, type LogViewHandle } from "./LogView";
-import { ResourceMonitor } from "./ResourceMonitor";
 
 const MIN_PANEL_SIZE = 50;
 const LOG_VIEW_COLUMNS: LogViewColumn[] = [
@@ -127,7 +126,6 @@ export default function App() {
   return (
     <Group orientation="vertical">
       <div>
-        <ResourceMonitor />
         <FilePicker
           setFile={(nextFile) => {
             setSelectedEntryNumber(null);
