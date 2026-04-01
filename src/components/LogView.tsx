@@ -1,6 +1,6 @@
 import React from "react";
 
-import { type LogEntry, type LogSearcher } from "./logAccess";
+import { type LogEntry, type LogSearcher } from "../logAccess";
 
 import clsx from "clsx";
 import {
@@ -17,9 +17,9 @@ import { useMove } from "react-aria";
 
 import { Virtuoso, type ListItem, type VirtuosoHandle } from "react-virtuoso";
 
+import { binarySearch } from "../util/binarySearch";
+import { clamp } from "../util/clamp";
 import styles from "./LogView.module.css";
-import { binarySearch } from "./util/binarySearch";
-import { clamp } from "./util/clamp";
 
 const GRID_TEMPLATE_COLUMNS_VAR = "--grid-template-columns";
 const CONSUME_GRID_TEMPLATE_COLUMNS: CSSProperties = {
