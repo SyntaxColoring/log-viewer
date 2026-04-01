@@ -1,5 +1,4 @@
 import { type JSX } from "react";
-import styles from "./FieldList.module.css";
 
 export interface FieldListProps {
   data: Record<string, string>;
@@ -9,11 +8,11 @@ export function FieldList({ data }: FieldListProps): JSX.Element {
   const entries = Object.entries(data).sort((a, b) => a[0].localeCompare(b[0]));
 
   return (
-    <dl className={styles.list}>
+    <dl className="columns-[40ch_auto] gap-[3ch] [column-fill:balance] [column-rule:1px_solid_#ddd]">
       {entries.map(([key, value]) => (
-        <div className={styles.listItem} key={key}>
-          <dt className={styles.term}>{key}</dt>
-          <dd className={styles.definition}>{value}</dd>
+        <div className="mbe-[2ch] break-inside-avoid" key={key}>
+          <dt className="font-semibold">{key}</dt>
+          <dd className="ml-4 line-clamp-3">{value}</dd>
         </div>
       ))}
     </dl>

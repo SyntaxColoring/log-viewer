@@ -2,8 +2,6 @@ import { Fragment, type JSX } from "react";
 
 import { findAllMatches } from "../textSearch/query";
 
-import styles from "./MarkedText.module.css";
-
 /**
  * Renders the bare `text`, with the matching parts wrapped in `<mark>`.
  **/
@@ -19,7 +17,7 @@ export default function MarkedText({
     <>
       {chunks.map(({ text, isMatch }, index) => (
         <Fragment key={index}>
-          {isMatch ? <mark className={styles.mark}>{text}</mark> : text}
+          {isMatch ? <mark className="bg-yellow-400">{text}</mark> : text}
         </Fragment>
       ))}
     </>
