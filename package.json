@@ -45,7 +45,7 @@
     "preview": "vite preview",
     "check": "npm run check-types && npm run check-lint && npm run check-format",
     "check-types": "tsc -b",
-    "check-lint": "eslint . --report-unused-disable-directives --max-warnings 0",
+    "check-lint": "eslint . --max-warnings 0",
     "check-format": "prettier --check .",
     "fix-format": "prettier --write .",
     "fix-lint": "eslint . --fix",
