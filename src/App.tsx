@@ -6,6 +6,9 @@ import { ImportProgressOverlay } from "./components/ImportProgressOverlay";
 import { LogViewPage } from "./components/LogViewPage";
 import { type LogSearcher, buildLogSearcher } from "./logAccess";
 
+// Note: This should match the static title in index.html.
+const BASE_PAGE_TITLE = "Log Viewer";
+
 type PendingImportState =
   | { status: "importing"; fileName: string; progress: number }
   | { status: "error"; fileName: string; message: string };
@@ -68,21 +71,24 @@ export default function App() {
     setPendingImport(null);
   }, []);
 
-  const pageContent =
-    currentSuccessfulImport === null ? (
-      <HomePage onFileSelect={startImport} />
-    ) : (
-      <LogViewPage
-        key={currentSuccessfulImport.importId}
-        searcher={currentSuccessfulImport.searcher}
-        onReturnHome={returnToHome}
-        onFileSelect={startImport}
-      />
-    );
+  const pageTitle =
+    currentSuccessfulImport === null
+      ? BASE_PAGE_TITLE
+      : `${currentSuccessfulImport.fileName} – ${BASE_PAGE_TITLE}`;
 
   return (
     <>
-      {pageContent}
+      <title>{pageTitle}</title>
+      {currentSuccessfulImport === null ? (
+        <HomePage onFileSelect={startImport} />
+      ) : (
+        <LogViewPage
+          key={currentSuccessfulImport.importId}
+          searcher={currentSuccessfulImport.searcher}
+          onReturnHome={returnToHome}
+          onFileSelect={startImport}
+        />
+      )}
       {pendingImport?.status === "importing" && (
         <ImportProgressOverlay
           fileName={pendingImport.fileName}
