@@ -26,8 +26,6 @@ const CONSUME_GRID_TEMPLATE_COLUMNS: CSSProperties = {
   gridTemplateColumns: `var(${GRID_TEMPLATE_COLUMNS_VAR})`,
 };
 
-const VIRTUOSO_OVERSCAN = 1000;
-
 const DEFAULT_COLUMN_WIDTH = 100;
 const MIN_COLUMN_WIDTH = 20;
 
@@ -255,7 +253,6 @@ function Body(props: BodyProps): JSX.Element {
           virtuosoScrollerRef.current = scroller;
         }}
         totalCount={entryNumbers.length}
-        overscan={{ main: VIRTUOSO_OVERSCAN, reverse: VIRTUOSO_OVERSCAN }}
         computeItemKey={(virtualizedIndex) => entryNumbers[virtualizedIndex]}
         itemContent={renderItemContent}
         itemsRendered={setItemsRendered}
