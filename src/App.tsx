@@ -1,10 +1,12 @@
 import React from "react";
 
+import { DropFileOverlay } from "./components/DropFileOverlay";
 import { HomePage } from "./components/HomePage";
 import { ImportErrorOverlay } from "./components/ImportErrorOverlay";
 import { ImportProgressOverlay } from "./components/ImportProgressOverlay";
 import { LogViewPage } from "./components/LogViewPage";
 import { type LogSearcher, buildLogSearcher } from "./logAccess";
+import { useWindowFileDrop } from "./useWindowFileDrop";
 
 // Note: This should match the static title in index.html.
 const BASE_PAGE_TITLE = "Log Viewer";
@@ -65,6 +67,12 @@ export default function App() {
     );
   }, []);
 
+  const fileDropsEnabled = pendingImport?.status !== "importing";
+  const { isDragActive: isDragOverlayVisible } = useWindowFileDrop({
+    onDrop: startImport,
+    enableDrops: fileDropsEnabled,
+  });
+
   const returnToHome = React.useCallback(() => {
     latestImportId.current += 1;
     setCurrentSuccessfulImport(null);
@@ -102,6 +110,7 @@ export default function App() {
           onDismiss={() => setPendingImport(null)}
         />
       )}
+      <DropFileOverlay isVisible={isDragOverlayVisible} />
     </>
   );
 }
