@@ -20,6 +20,7 @@ import { Virtuoso, type ListItem, type VirtuosoHandle } from "react-virtuoso";
 import { binarySearch } from "../../util/binarySearch";
 import { clamp } from "../../util/clamp";
 import styles from "./index.module.css";
+import { usePrefetchForScroll } from "./usePrefetcher";
 
 const GRID_TEMPLATE_COLUMNS_VAR = "--grid-template-columns";
 const CONSUME_GRID_TEMPLATE_COLUMNS: CSSProperties = {
@@ -206,6 +207,18 @@ function Body(props: BodyProps): JSX.Element {
 
   const [itemsRendered, setItemsRendered] = useState<ListItem<unknown>[]>([]);
 
+  const { loadedItems } = usePrefetchForScroll({
+    indicesVisibleNow: itemsRendered.map(item => item.index),
+    itemCount: entryNumbers.length,
+    prefetchCount: 100,
+    prefetchTriggerDistance: 5,
+    load: async (indexes) => {
+      const result = await logSearcher.getEntries(indexes.map(index => entryNumbers[index]))
+      console.log("Load indices", indexes, "result", result);
+      return result;
+    }
+  })
+
   const renderItemContent = useCallback(
     (virtualizedIndex: number) => {
       const entryNumber = entryNumbers[virtualizedIndex];
@@ -213,7 +226,7 @@ function Body(props: BodyProps): JSX.Element {
         <EntryRow
           rowIndex={virtualizedIndex}
           entryNumber={entryNumber}
-          logSearcher={logSearcher}
+          loadedRows={loadedItems}
           columns={columns}
           query={query}
           isSelected={selectedVirtualizedIndex === virtualizedIndex}
@@ -224,7 +237,7 @@ function Body(props: BodyProps): JSX.Element {
     [
       columns,
       entryNumbers,
-      logSearcher,
+      loadedItems,
       onSelectedEntryNumberChange,
       query,
       selectedVirtualizedIndex,
@@ -275,7 +288,7 @@ interface LoadedEntryProps {
 interface EntryRowProps {
   rowIndex: number;
   entryNumber: number;
-  logSearcher: LogSearcher;
+  loadedRows: Map<number, LogEntry>,
   columns: LogViewColumn[];
   query: string | null;
   isSelected: boolean;
@@ -286,13 +299,13 @@ function EntryRow(props: EntryRowProps): JSX.Element {
   const {
     rowIndex,
     entryNumber,
-    logSearcher,
+    loadedRows,
     columns,
     query,
     isSelected,
     onClick,
   } = props;
-  const entry = useLoadEntry(logSearcher, entryNumber);
+  const entry = loadedRows.get(entryNumber) ?? null;
   if (entry === null) {
     return <UnloadedEntry isSelected={isSelected} onClick={onClick} />;
   }
@@ -364,29 +377,6 @@ function UnloadedEntry(props: UnloadedEntryProps): JSX.Element {
       <div className={clsx(styles.td, styles.spanAllColumns)}>loading...</div>
     </div>
   );
-}
-
-function useLoadEntry(
-  logSearcher: LogSearcher,
-  entryNumber: number,
-): LogEntry | null {
-  const [loadedEntry, setLoadedEntry] = React.useState<LogEntry | null>(null);
-
-  React.useEffect(() => {
-    let ignore = false;
-    setLoadedEntry(null);
-    const load = async () => {
-      const entries = await logSearcher.getEntries([entryNumber]);
-      if (!ignore) setLoadedEntry(entries[0]);
-    };
-    // eslint-disable-next-line @typescript-eslint/no-floating-promises
-    load();
-    return () => {
-      ignore = true;
-    };
-  }, [logSearcher, entryNumber]);
-
-  return loadedEntry;
 }
 
 function BodyCell(
