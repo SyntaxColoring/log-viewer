@@ -11,6 +11,11 @@ import { Button } from "@/shadcn/components/ui/button";
 import { Datetime } from "./Datetime";
 import { FieldList } from "./FieldList";
 import FileImportButton from "./FileImportButton";
+import {
+  DEFAULT_PRIORITY,
+  type FilterFieldValues,
+  LogFiltersPopover,
+} from "./LogFiltersPopover";
 import { LogView, type LogViewColumn, type LogViewHandle } from "./LogView";
 import MarkedText from "./MarkedText";
 import { ResizablePanelSeparator } from "./ResizablePanelSeparator";
@@ -96,7 +101,21 @@ export function LogViewPage({
   );
 
   const [searchQuery, setSearchQuery] = React.useState("");
-  const searchResult = useSearch(searcher, searchQuery);
+  const [filters, setFilters] = React.useState<FilterFieldValues>({
+    leastSeverePriority: DEFAULT_PRIORITY,
+    units: [],
+    syslogIdentifiers: [],
+  });
+
+  const unitFilterOptions = [...searcher.getSeenUnits()].sort((a, b) =>
+    a.localeCompare(b),
+  );
+  const syslogIdentifierFilterOptions = [
+    ...searcher.getSeenSyslogIdentifiers(),
+  ].sort((a, b) => a.localeCompare(b));
+
+  const searchResult = useSearch(searcher, searchQuery, filters);
+
   const [selectedEntryNumber, setSelectedEntryNumber] = React.useState<
     number | null
   >(null);
@@ -143,7 +162,17 @@ export function LogViewPage({
           </Button>
           <FileImportButton onFileSelect={onFileSelect} />
         </div>
-        <SearchBar ref={searchBarRef} {...searchBarProps} />
+        <div className="m-2 flex flex-wrap items-center gap-2">
+          <div className="min-w-64 flex-1">
+            <SearchBar ref={searchBarRef} {...searchBarProps} />
+          </div>
+          <LogFiltersPopover
+            filters={filters}
+            onFiltersChange={setFilters}
+            unitOptions={unitFilterOptions}
+            syslogIdentifierOptions={syslogIdentifierFilterOptions}
+          />
+        </div>
       </div>
       <Panel minSize={MIN_PANEL_SIZE}>
         <LogView
@@ -186,7 +215,11 @@ export function LogViewPage({
   );
 }
 
-function useSearch(searcher: LogSearcher, query: string): SearchResultState {
+function useSearch(
+  searcher: LogSearcher,
+  query: string,
+  filters: FilterFieldValues,
+): SearchResultState {
   const [searchResult, setSearchResult] = React.useState<SearchResultState>({
     state: "noSearch",
   });
@@ -199,9 +232,12 @@ function useSearch(searcher: LogSearcher, query: string): SearchResultState {
         const nextResultSet = await searcher.search(
           {
             substring: query === "" ? null : query,
-            minimumPriority: null,
-            units: null,
-            syslogIdentifiers: null,
+            minimumPriority: filters.leastSeverePriority,
+            units: filters.units.length === 0 ? null : filters.units,
+            syslogIdentifiers:
+              filters.syslogIdentifiers.length === 0
+                ? null
+                : filters.syslogIdentifiers,
           },
           abortController.signal,
         );
@@ -223,7 +259,7 @@ function useSearch(searcher: LogSearcher, query: string): SearchResultState {
     return () => {
       abortController.abort();
     };
-  }, [searcher, query]);
+  }, [searcher, query, filters]);
 
   return searchResult;
 }
