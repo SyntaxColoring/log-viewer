@@ -185,6 +185,15 @@ interface BodyProps {
   onSelectedEntryNumberChange?: (newSelectedEntryNumber: number) => void;
 }
 
+interface VirtuosoContext {
+  entryNumbers: number[];
+  logSearcher: LogSearcher;
+  columns: LogViewColumn[];
+  query: string | null;
+  onSelectedEntryNumberChange?: (newSelectedEntryNumber: number) => void;
+  selectedEntryNumber: number | null;
+}
+
 function Body(props: BodyProps): JSX.Element {
   const {
     tableBodyRef,
@@ -207,36 +216,41 @@ function Body(props: BodyProps): JSX.Element {
     [entryNumbers, selectedEntryNumber],
   );
 
-  const renderItemContent = useCallback(
-    (virtualizedIndex: number) => {
-      const entryNumber = entryNumbers[virtualizedIndex];
-      return (
-        <EntryRow
-          rowIndex={virtualizedIndex}
-          entryNumber={entryNumber}
-          logSearcher={logSearcher}
-          columns={columns}
-          query={query}
-          isSelected={selectedVirtualizedIndex === virtualizedIndex}
-          onClick={() => onSelectedEntryNumberChange?.(entryNumber)}
-        />
-      );
-    },
-    [
-      columns,
-      entryNumbers,
+  const virtuosoContext: VirtuosoContext = React.useMemo(
+    () => ({
       logSearcher,
-      onSelectedEntryNumberChange,
+      columns,
       query,
-      selectedVirtualizedIndex,
+      onSelectedEntryNumberChange,
+      entryNumbers,
+      selectedEntryNumber,
+    }),
+    [
+      logSearcher,
+      columns,
+      query,
+      onSelectedEntryNumberChange,
+      entryNumbers,
+      selectedEntryNumber,
     ],
+  );
+
+  const renderItemContent = useCallback(
+    (virtualizedIndex: number, _data: unknown, context: VirtuosoContext) => (
+      <EntryRow
+        virtualizedIndex={virtualizedIndex}
+        entryNumber={context.entryNumbers[virtualizedIndex]}
+        context={context}
+      />
+    ),
+    [],
   );
 
   function handleKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {
     if (
       !isNavigationKey(event.key) ||
       virtuosoScrollerRef.current === null ||
-      // For type checker appeasement only. It should never be instanceof Window. 
+      // For type checker appeasement only. It should never be instanceof Window.
       virtuosoScrollerRef.current instanceof Window
     ) {
       return;
@@ -263,7 +277,7 @@ function Body(props: BodyProps): JSX.Element {
       tabIndex={0}
       onKeyDown={handleKeyDown}
     >
-      <Virtuoso
+      <Virtuoso<unknown, VirtuosoContext>
         ref={virtuosoRef}
         scrollerRef={(scroller) => {
           virtuosoScrollerRef.current = scroller;
@@ -273,6 +287,7 @@ function Body(props: BodyProps): JSX.Element {
         computeItemKey={(virtualizedIndex) => entryNumbers[virtualizedIndex]}
         itemContent={renderItemContent}
         itemsRendered={(items) => (itemsRenderedRef.current = items)}
+        context={virtuosoContext}
         /* Virtuoso adds a tab-stop by default ({0}). Disable that, since we add our own. */
         tabIndex={-1}
       />
@@ -290,37 +305,39 @@ interface LoadedEntryProps {
 }
 
 interface EntryRowProps {
-  rowIndex: number;
+  virtualizedIndex: number;
   entryNumber: number;
-  logSearcher: LogSearcher;
-  columns: LogViewColumn[];
-  query: string | null;
-  isSelected: boolean;
-  onClick?: () => void;
+  context: VirtuosoContext;
 }
 
 function EntryRow(props: EntryRowProps): JSX.Element {
+  const { virtualizedIndex, entryNumber, context } = props;
   const {
-    rowIndex,
-    entryNumber,
     logSearcher,
     columns,
     query,
-    isSelected,
-    onClick,
-  } = props;
+    selectedEntryNumber,
+    onSelectedEntryNumberChange,
+  } = context;
+
+  const isSelected = selectedEntryNumber === entryNumber;
   const entry = useLoadEntry(logSearcher, entryNumber);
+
+  const handleClick = React.useCallback(() => {
+    onSelectedEntryNumberChange?.(entryNumber);
+  }, [onSelectedEntryNumberChange, entryNumber]);
+
   if (entry === null) {
-    return <UnloadedEntry isSelected={isSelected} onClick={onClick} />;
+    return <UnloadedEntry isSelected={isSelected} onClick={handleClick} />;
   }
   return (
     <LoadedEntry
       data={entry}
       columns={columns}
       query={query}
-      rowIndex={rowIndex}
+      rowIndex={virtualizedIndex}
       isSelected={isSelected}
-      onClick={onClick}
+      onClick={handleClick}
     />
   );
 }
