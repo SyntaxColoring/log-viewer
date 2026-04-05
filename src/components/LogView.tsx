@@ -236,7 +236,7 @@ function Body(props: BodyProps): JSX.Element {
     if (
       !isNavigationKey(event.key) ||
       virtuosoScrollerRef.current === null ||
-      // For type checker appeasement only. It should never be instanceof Window. 
+      // For type checker appeasement only. It should never be instanceof Window.
       virtuosoScrollerRef.current instanceof Window
     ) {
       return;
