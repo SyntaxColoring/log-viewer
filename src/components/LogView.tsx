@@ -197,6 +197,7 @@ function Body(props: BodyProps): JSX.Element {
   } = props;
   const virtuosoRef = useRef<VirtuosoHandle | null>(null);
   const virtuosoScrollerRef = useRef<HTMLElement | Window | null>(null);
+  const itemsRenderedRef = useRef<ListItem<unknown>[]>([]);
 
   const selectedVirtualizedIndex = React.useMemo(
     () =>
@@ -205,8 +206,6 @@ function Body(props: BodyProps): JSX.Element {
         : null,
     [entryNumbers, selectedEntryNumber],
   );
-
-  const [itemsRendered, setItemsRendered] = useState<ListItem<unknown>[]>([]);
 
   const renderItemContent = useCallback(
     (virtualizedIndex: number) => {
@@ -233,14 +232,29 @@ function Body(props: BodyProps): JSX.Element {
     ],
   );
 
-  const handleKeyDown = useBodyKeyboardNavigation(
-    entryNumbers,
-    selectedVirtualizedIndex,
-    itemsRendered,
-    virtuosoRef,
-    virtuosoScrollerRef,
-    onSelectedEntryNumberChange,
-  );
+  function handleKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {
+    if (
+      !isNavigationKey(event.key) ||
+      virtuosoScrollerRef.current === null ||
+      // For type checker appeasement only. It should never be instanceof Window. 
+      virtuosoScrollerRef.current instanceof Window
+    ) {
+      return;
+    }
+
+    event.preventDefault();
+
+    const newSelectedRowIndex = getKeyboardNavigationTarget(
+      entryNumbers.length,
+      selectedVirtualizedIndex,
+      getViewedRowsInfo(itemsRenderedRef.current, virtuosoScrollerRef.current),
+      event.key,
+    );
+    if (newSelectedRowIndex !== null) {
+      virtuosoRef.current?.scrollIntoView({ index: newSelectedRowIndex });
+      onSelectedEntryNumberChange?.(entryNumbers[newSelectedRowIndex]);
+    }
+  }
 
   return (
     <div
@@ -258,7 +272,7 @@ function Body(props: BodyProps): JSX.Element {
         overscan={{ main: VIRTUOSO_OVERSCAN, reverse: VIRTUOSO_OVERSCAN }}
         computeItemKey={(virtualizedIndex) => entryNumbers[virtualizedIndex]}
         itemContent={renderItemContent}
-        itemsRendered={setItemsRendered}
+        itemsRendered={(items) => (itemsRenderedRef.current = items)}
         /* Virtuoso adds a tab-stop by default ({0}). Disable that, since we add our own. */
         tabIndex={-1}
       />
@@ -464,96 +478,66 @@ function getGridTemplateColumns(
   );
 }
 
-function useBodyKeyboardNavigation(
-  entryNumbers: number[],
-  selectedVirtualizedIndex: number | null,
-  itemsRendered: ListItem<unknown>[],
-  virtuosoRef: React.RefObject<VirtuosoHandle | null>,
-  virtuosoScrollerRef: React.RefObject<HTMLElement | Window | null>,
-  onSelectedEntryNumberChange?: (newSelectedEntryNumber: number) => void,
-): (event: React.KeyboardEvent<HTMLDivElement>) => void {
-  return useCallback(
-    (event: React.KeyboardEvent<HTMLDivElement>) => {
-      if (!onSelectedEntryNumberChange || entryNumbers.length === 0) return;
+const NAVIGATION_KEYS = [
+  "ArrowUp",
+  "ArrowDown",
+  "Home",
+  "End",
+  "PageUp",
+  "PageDown",
+] as const;
+type NavigationKey = (typeof NAVIGATION_KEYS)[number];
 
-      const first = 0;
-      const last = entryNumbers.length - 1;
-
-      let nextVirtualizedIndex: number | null = null;
-      switch (event.key) {
-        case "ArrowUp": {
-          nextVirtualizedIndex =
-            selectedVirtualizedIndex === null
-              ? last
-              : Math.max(first, selectedVirtualizedIndex - 1);
-          break;
-        }
-        case "ArrowDown": {
-          nextVirtualizedIndex =
-            selectedVirtualizedIndex === null
-              ? first
-              : Math.min(last, selectedVirtualizedIndex + 1);
-          break;
-        }
-        case "Home": {
-          nextVirtualizedIndex = first;
-          break;
-        }
-        case "End": {
-          nextVirtualizedIndex = last;
-          break;
-        }
-        case "PageUp": {
-          const viewedRowsInfo = getItemsFullyInView(
-            itemsRendered,
-            virtuosoScrollerRef,
-          );
-          const { pageUpVirtualizedIndex } = getPageUpDownTargets(
-            viewedRowsInfo,
-            selectedVirtualizedIndex,
-            entryNumbers.length,
-          );
-          nextVirtualizedIndex = pageUpVirtualizedIndex;
-          break;
-        }
-        case "PageDown": {
-          const viewedRowsInfo = getItemsFullyInView(
-            itemsRendered,
-            virtuosoScrollerRef,
-          );
-          const { pageDownVirtualizedIndex } = getPageUpDownTargets(
-            viewedRowsInfo,
-            selectedVirtualizedIndex,
-            entryNumbers.length,
-          );
-          nextVirtualizedIndex = pageDownVirtualizedIndex;
-          break;
-        }
-      }
-
-      if (nextVirtualizedIndex === null) return;
-
-      event.preventDefault();
-      virtuosoRef.current?.scrollIntoView({
-        index: nextVirtualizedIndex,
-      });
-      onSelectedEntryNumberChange(entryNumbers[nextVirtualizedIndex]);
-    },
-    [
-      entryNumbers,
-      itemsRendered,
-      onSelectedEntryNumberChange,
-      selectedVirtualizedIndex,
-      virtuosoRef,
-      virtuosoScrollerRef,
-    ],
-  );
+function isNavigationKey(key: string): key is NavigationKey {
+  return NAVIGATION_KEYS.includes(key as NavigationKey);
 }
 
-type ViewedRowsInfo = {
-  firstFullyInView: number;
-  lastFullyInView: number;
-} | null;
+/**
+ * Returns the row index that should be selected in response to a keyboard event,
+ * or null if the event should not cause a selection change.
+ */
+function getKeyboardNavigationTarget(
+  rowCount: number,
+  selectedRowIndex: number | null,
+  viewedRowsInfo: ViewedRowsInfo,
+  key: NavigationKey,
+): number | null {
+  if (rowCount === 0) return null;
+
+  const first = 0;
+  const last = rowCount - 1;
+
+  switch (key) {
+    case "ArrowUp": {
+      return selectedRowIndex === null
+        ? last
+        : Math.max(first, selectedRowIndex - 1);
+    }
+    case "ArrowDown": {
+      return selectedRowIndex === null
+        ? first
+        : Math.min(last, selectedRowIndex + 1);
+    }
+    case "Home": {
+      return first;
+    }
+    case "End": {
+      return last;
+    }
+    case "PageUp": {
+      return getPageUpDownTargets(viewedRowsInfo, selectedRowIndex, rowCount)
+        .pageUpVirtualizedIndex;
+    }
+    case "PageDown": {
+      return getPageUpDownTargets(viewedRowsInfo, selectedRowIndex, rowCount)
+        .pageDownVirtualizedIndex;
+    }
+    default: {
+      key satisfies never;
+      return null;
+    }
+  }
+}
 
 function getPageUpDownTargets(
   viewedRowsInfo: ViewedRowsInfo,
@@ -600,16 +584,17 @@ function getPageUpDownTargets(
   };
 }
 
-function getItemsFullyInView(
+type ViewedRowsInfo = {
+  firstFullyInView: number;
+  lastFullyInView: number;
+} | null;
+
+function getViewedRowsInfo(
   itemsRendered: ListItem<unknown>[],
-  virtuosoScrollerRef: React.RefObject<HTMLElement | Window | null>,
+  virtuosoScroller: HTMLElement,
 ): ViewedRowsInfo {
-  const scroller = virtuosoScrollerRef.current;
-  if (scroller === null) return null;
-  const scrollerTop =
-    scroller instanceof Window ? scroller.scrollY : scroller.scrollTop;
-  const scrollerHeight =
-    scroller instanceof Window ? scroller.innerHeight : scroller.clientHeight;
+  const scrollerTop = virtuosoScroller.scrollTop;
+  const scrollerHeight = virtuosoScroller.clientHeight;
   const scrollerBottom = scrollerTop + scrollerHeight;
   const fullyInViewRows = itemsRendered.filter(
     (item) =>
