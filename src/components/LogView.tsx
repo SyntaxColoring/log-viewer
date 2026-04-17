@@ -391,6 +391,8 @@ function useLoadEntry(
 
   React.useEffect(() => {
     let ignore = false;
+    // I know of no better way to do this.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoadedEntry(null);
     const load = async () => {
       const entries = await logSearcher.getEntries([entryNumber]);

@@ -207,15 +207,16 @@ function useSelectedEntry(
 
   React.useEffect(() => {
     let ignore = false;
-    if (selectedEntryNumber === null) {
-      setSelectedEntry(null);
-      return;
-    }
 
+    // I know of no better way to do this.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setSelectedEntry(null);
+
     const load = async () => {
-      const entries = await searcher.getEntries([selectedEntryNumber]);
-      if (!ignore) setSelectedEntry(entries[0] ?? null);
+      let entry: LogEntry | null = null;
+      if (selectedEntryNumber === null) entry = null;
+      else [entry] = await searcher.getEntries([selectedEntryNumber]);
+      if (!ignore) setSelectedEntry(entry);
     };
     // eslint-disable-next-line @typescript-eslint/no-floating-promises
     load();
