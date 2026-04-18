@@ -115,15 +115,16 @@ export async function buildLogSearcher(
     params: SearchParams,
     abortSignal?: AbortSignal,
   ): Promise<number[]> => {
+    const allEntryNumbers = byteRanges.map((_, i) => i);
+
     if (params.substring === null) {
-      const allEntryNumbers = byteRanges.map((_, i) => i);
       return allEntryNumbers;
     }
 
     // TODO: This call to textSearchIndex.search() can be slow. Run it in a WebWorker.
-    const candidateEntryNumbers = textSearchIndex.search(
-      normalize(params.substring),
-    );
+    const candidateEntryNumbers =
+      textSearchIndex.search(normalize(params.substring)) ?? allEntryNumbers;
+
     const matchingEntryNumbers: number[] = [];
     for (let i = 0; i < candidateEntryNumbers.length; i++) {
       abortSignal?.throwIfAborted();

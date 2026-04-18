@@ -22,13 +22,24 @@ export class NgramIndex<T> {
     }
   }
 
-  search(searchText: string): T[] {
+  /**
+   * Returns the document IDs that MIGHT contain the given search text.
+   * If the given search text is too short to be supported by this index,
+   * returns null.
+   */
+  search(searchText: string): T[] | null {
     const uniqueSearchNgrams = [...new Set(extractNgrams(searchText, this.n))];
-    const containingDocumentsPerNgram = uniqueSearchNgrams.map(
-      (ngram) => this.index.get(ngram) ?? new Set<T>(),
-    );
-    const documentsContainingAllNgrams = intersect(containingDocumentsPerNgram);
-    return [...documentsContainingAllNgrams];
+    if (uniqueSearchNgrams.length > 0) {
+      const containingDocumentsPerNgram = uniqueSearchNgrams.map(
+        (ngram) => this.index.get(ngram) ?? new Set<T>(),
+      );
+      const documentsContainingAllNgrams = intersect(
+        containingDocumentsPerNgram,
+      );
+      return [...documentsContainingAllNgrams];
+    } else {
+      return null;
+    }
   }
 
   private registerNgram(ngram: string, documentID: T) {
