@@ -2,9 +2,13 @@ import { X } from "lucide-react";
 import React, { type JSX } from "react";
 import { Group, Panel } from "react-resizable-panels";
 
+import {
+  type LogEntry,
+  type LogSearcher,
+  type ResultSet,
+  UNDERLYING_RAW_FIELDS,
+} from "@/backend";
 import { Button } from "@/shadcn/components/ui/button";
-import { type LogSearcher, type ResultSet } from "../logAccess";
-import { type LogEntry, UNDERLYING_RAW_FIELDS } from "../logEntry";
 import { Datetime } from "./Datetime";
 import { FieldList } from "./FieldList";
 import FileImportButton from "./FileImportButton";

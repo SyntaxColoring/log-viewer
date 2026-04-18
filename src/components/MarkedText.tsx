@@ -1,6 +1,6 @@
 import { Fragment, type JSX } from "react";
 
-import { findAllMatches } from "../textSearch/query";
+import { findAllMatches } from "@/backend";
 
 /**
  * Renders the bare `text`, with the matching parts wrapped in `<mark>`.

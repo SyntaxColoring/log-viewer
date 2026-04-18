@@ -1,7 +1,10 @@
 import React from "react";
 
-import { type LogEntry, type SyslogPriority } from "@/logEntry";
-import { type LogSearcher } from "../logAccess";
+import {
+  type LogEntry,
+  type LogSearcher,
+  type SyslogPriority,
+} from "@/backend";
 
 import clsx from "clsx";
 import {

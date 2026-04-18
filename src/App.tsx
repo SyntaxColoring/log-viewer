@@ -1,11 +1,11 @@
 import React from "react";
 
+import { type LogSearcher, buildLogSearcher } from "@/backend";
 import { DropFileOverlay } from "./components/DropFileOverlay";
 import { HomePage } from "./components/HomePage";
 import { ImportErrorOverlay } from "./components/ImportErrorOverlay";
 import { ImportProgressOverlay } from "./components/ImportProgressOverlay";
 import { LogViewPage } from "./components/LogViewPage";
-import { type LogSearcher, buildLogSearcher } from "./logAccess";
 import { useWindowFileDrop } from "./useWindowFileDrop";
 
 // Note: This should match the static title in index.html.
