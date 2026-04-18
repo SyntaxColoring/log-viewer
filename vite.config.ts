@@ -1,3 +1,5 @@
+/// <reference types="vitest/config" />
+
 import babel from "@rolldown/plugin-babel";
 import tailwindcss from "@tailwindcss/vite";
 import react, { reactCompilerPreset } from "@vitejs/plugin-react";
@@ -15,5 +17,13 @@ export default defineConfig({
     alias: {
       "@": path.resolve(__dirname, "./src"),
     },
+  },
+  define: {
+    // Per Vitest docs: Make sure in-source tests, gated behind `if (import.meta.vitest)`,
+    // can be eliminated as dead code in the production build.
+    "import.meta.vitest": "undefined",
+  },
+  test: {
+    includeSource: ["src/**/*.{js,ts,tsx}"],
   },
 });
