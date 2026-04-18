@@ -197,7 +197,12 @@ function useSearch(searcher: LogSearcher, query: string): SearchResultState {
       setSearchResult({ state: "inProgress" });
       try {
         const nextResultSet = await searcher.search(
-          { substring: query === "" ? null : query },
+          {
+            substring: query === "" ? null : query,
+            minimumPriority: null,
+            units: null,
+            syslogIdentifiers: null,
+          },
           abortController.signal,
         );
         setSearchResult({

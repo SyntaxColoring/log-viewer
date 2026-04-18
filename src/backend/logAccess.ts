@@ -1,5 +1,6 @@
 import { makeIntervalYielder } from "event-loop-yielder";
 
+import { FieldValueIndex } from "./fieldValueIndex";
 import chunks from "./journalParsing/chunks";
 import jsonRecordSplitter, {
   type ParsedJSON,
@@ -8,7 +9,9 @@ import {
   BINARY_DATA_PLACEHOLDER,
   getValidatedFields,
   type LogEntry,
+  type SyslogPriority,
 } from "./logEntry";
+import { intersect, union } from "./setUtils";
 import { NgramIndex } from "./textSearch/ngramIndex";
 import { normalize } from "./textSearch/normalize";
 
@@ -30,15 +33,23 @@ export interface LogSearcher {
 
   /** Returns the full contents of the given entries. */
   getEntries: (entryNumbers: number[]) => Promise<LogEntry[]>;
+
+  getSeenUnits: () => Set<string>;
+  getSeenSyslogIdentifiers: () => Set<string>;
 }
 
 export interface SearchParams {
-  /**
-   * If null, do not filter based on substring (return all entries).
-   * If non-null, filter entries whose normalized message includes this substring.
-   */
-  substring: string | null;
-  // TODO: Also allow filtering by unit, priority, etc.
+  /** If provided, return only entries whose normalized message includes this substring. */
+  substring?: string | null;
+
+  /** If provided, return only entries with this priority or higher. */
+  minimumPriority?: SyslogPriority | null;
+
+  /** If provided, return only entries from one of these units. */
+  units?: string[] | null;
+
+  /** If provided, return only entries having one of these syslog identifiers. */
+  syslogIdentifiers?: string[] | null;
 }
 
 interface ByteRange {
@@ -50,8 +61,12 @@ export async function buildLogSearcher(
   file: File,
   onProgress?: (progress0To1: number) => void,
 ): Promise<LogSearcher> {
-  const textSearchIndex = new NgramIndex<number>(3);
   const byteRanges: ByteRange[] = [];
+
+  const ngramIndex = new NgramIndex<number>(3);
+  const priorityIndex = new FieldValueIndex();
+  const unitIndex = new FieldValueIndex();
+  const syslogIdentifierIndex = new FieldValueIndex();
 
   const maybeYieldToEventLoop = makeIntervalYielder(YIELD_INTERVAL);
 
@@ -67,10 +82,19 @@ export async function buildLogSearcher(
       beginByteIndex: entry.beginByteIndex,
       endByteIndex: entry.endByteIndex,
     });
-    textSearchIndex.addDocument(
-      newEntryNumber,
-      normalize(parsedEntry.validatedFields.message),
-    );
+
+    const { message, priority, unit, syslogIdentifier } =
+      parsedEntry.validatedFields;
+    ngramIndex.addDocument(newEntryNumber, normalize(message));
+    if (priority !== null) {
+      priorityIndex.addEntry(newEntryNumber, priority.toString());
+    }
+    if (unit !== null) {
+      unitIndex.addEntry(newEntryNumber, unit);
+    }
+    if (syslogIdentifier !== null) {
+      syslogIdentifierIndex.addEntry(newEntryNumber, syslogIdentifier);
+    }
 
     if (newEntryNumber % 10000 === 0) {
       onProgress?.(entry.endByteIndex / file.size);
@@ -111,44 +135,86 @@ export async function buildLogSearcher(
     return result;
   };
 
+  // TODO: Run all of this in a WebWorker.
   const search = async (
     params: SearchParams,
     abortSignal?: AbortSignal,
   ): Promise<number[]> => {
-    const allEntryNumbers = byteRanges.map((_, i) => i);
+    const nGramMatches = (() => {
+      if (params.substring == null) return null; // No text search query.
+      const ngramMatches = ngramIndex.search(normalize(params.substring));
+      if (ngramMatches == null) return null; // Query too short to be supported by the n-gram index.
+      return new Set(ngramMatches);
+    })();
 
-    if (params.substring === null) {
-      return allEntryNumbers;
-    }
+    const priorityMatches =
+      params.minimumPriority == null || params.minimumPriority === 7
+        ? null
+        : union(
+            getPriorityValues(params.minimumPriority).map((priority) =>
+              priorityIndex.getEntryNumbersForValue(priority.toString()),
+            ),
+          );
 
-    // TODO: This call to textSearchIndex.search() can be slow. Run it in a WebWorker.
-    const candidateEntryNumbers =
-      textSearchIndex.search(normalize(params.substring)) ?? allEntryNumbers;
+    const unitMatches =
+      params.units == null
+        ? null
+        : union(
+            params.units.map((unit) => unitIndex.getEntryNumbersForValue(unit)),
+          );
 
-    const matchingEntryNumbers: number[] = [];
-    for (let i = 0; i < candidateEntryNumbers.length; i++) {
+    const syslogIdentifierMatches =
+      params.syslogIdentifiers == null
+        ? null
+        : union(
+            params.syslogIdentifiers.map((syslogIdentifier) =>
+              syslogIdentifierIndex.getEntryNumbersForValue(syslogIdentifier),
+            ),
+          );
+
+    const setsToIntersect = [
+      nGramMatches,
+      priorityMatches,
+      unitMatches,
+      syslogIdentifierMatches,
+    ].filter((m) => m != null);
+
+    const setIntersection = (() => {
+      if (setsToIntersect.length > 0) {
+        return [...intersect(setsToIntersect)].sort((a, b) => a - b);
+      } else {
+        const allEntryNumbers = byteRanges.map((_, i) => i);
+        return allEntryNumbers;
+      }
+    })();
+
+    if (params.substring == null) {
+      return setIntersection;
+    } else {
+      const matchingEntryNumbers: number[] = [];
+      for (const candidateNumber of setIntersection) {
+        abortSignal?.throwIfAborted();
+        const candidateContents = await getEntry(candidateNumber);
+        if (
+          normalize(candidateContents.validatedFields.message).includes(
+            normalize(params.substring),
+          )
+        )
+          matchingEntryNumbers.push(candidateNumber);
+      }
+
       abortSignal?.throwIfAborted();
 
-      const candidateNumber = candidateEntryNumbers[i];
-      const candidate = await getEntry(candidateNumber);
-
-      if (
-        normalize(candidate.validatedFields.message).includes(
-          normalize(params.substring),
-        )
-      )
-        matchingEntryNumbers.push(candidateNumber);
+      return matchingEntryNumbers;
     }
-
-    abortSignal?.throwIfAborted();
-
-    return matchingEntryNumbers;
   };
 
   return {
     entryCount: byteRanges.length,
     search,
     getEntries,
+    getSeenUnits: () => unitIndex.getSeenValues(),
+    getSeenSyslogIdentifiers: () => syslogIdentifierIndex.getSeenValues(),
   };
 }
 
@@ -179,6 +245,12 @@ function toRawFields(parsedJSON: unknown): Map<string, string> {
     }
   }
   return result;
+}
+
+function getPriorityValues(minimumPriority: SyslogPriority): SyslogPriority[] {
+  const priorities: SyslogPriority[] = [7, 6, 5, 4, 3, 2, 1, 0] as const;
+  const index = priorities.indexOf(minimumPriority);
+  return priorities.slice(index);
 }
 
 if (import.meta.vitest) {
@@ -257,6 +329,42 @@ if (import.meta.vitest) {
           substring: "LOVE",
         }),
       ).toStrictEqual([1]);
+    });
+  });
+
+  describe("seen values", () => {
+    test("getSeenUnits returns distinct units", async () => {
+      const records: Record<string, string>[] = [
+        { MESSAGE: "a", _SYSTEMD_UNIT: "foo.service" },
+        { MESSAGE: "b", _SYSTEMD_UNIT: "bar.service" },
+        { MESSAGE: "c", _SYSTEMD_UNIT: "foo.service" },
+      ];
+      const searcher = await buildLogSearcher(journalFileFromRecords(records));
+      expect(searcher.getSeenUnits()).toStrictEqual(
+        new Set(["foo.service", "bar.service"]),
+      );
+    });
+
+    test("getSeenSyslogIdentifiers returns distinct syslog identifiers", async () => {
+      const records: Record<string, string>[] = [
+        { MESSAGE: "a", SYSLOG_IDENTIFIER: "sshd" },
+        { MESSAGE: "b", SYSLOG_IDENTIFIER: "systemd" },
+        { MESSAGE: "c", SYSLOG_IDENTIFIER: "sshd" },
+      ];
+      const searcher = await buildLogSearcher(journalFileFromRecords(records));
+      expect(searcher.getSeenSyslogIdentifiers()).toStrictEqual(
+        new Set(["sshd", "systemd"]),
+      );
+    });
+
+    test("empty sets when unit and syslog identifier are absent", async () => {
+      const records: Record<string, string>[] = [
+        { MESSAGE: "hello" },
+        { MESSAGE: "world" },
+      ];
+      const searcher = await buildLogSearcher(journalFileFromRecords(records));
+      expect(searcher.getSeenUnits()).toStrictEqual(new Set());
+      expect(searcher.getSeenSyslogIdentifiers()).toStrictEqual(new Set());
     });
   });
 }

@@ -1,3 +1,9 @@
+/**
+ * Public exports for the backend.
+ *
+ * The backend is responsible for efficiently parsing and searching log files.
+ */
+
 export { buildLogSearcher } from "./logAccess";
 export type { LogSearcher } from "./logAccess";
 

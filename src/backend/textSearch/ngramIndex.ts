@@ -1,3 +1,4 @@
+import { intersect } from "../setUtils";
 import { extractNgrams } from "./extractNgrams";
 
 // TODO: T needs to be non-null, non-undefined, and support equality comparisons.
@@ -42,47 +43,9 @@ export class NgramIndex<T> {
     }
   }
 
-  private registerNgram(ngram: string, documentID: T) {
+  private registerNgram(ngram: string, documentID: T): void {
     const existingSet = this.index.get(ngram);
     if (existingSet === undefined) this.index.set(ngram, new Set([documentID]));
     else existingSet.add(documentID);
   }
-}
-
-function intersect<T>(sets: Set<T>[]): Set<T> {
-  const result = new Set<T>();
-
-  if (sets.length > 0) {
-    // Optimization: query the sets with fewest elements first,
-    // assuming they're most likely to be missing elements from other sets.
-    const sortedSets = sets.slice().sort((a, b) => a.size - b.size);
-    const firstSet = sortedSets[0];
-    const otherSets = sortedSets.slice(1);
-
-    for (const element of firstSet) {
-      const elementInAllSets = lazyAll(
-        lazyMap(otherSets, (otherSet) => otherSet.has(element)),
-      );
-      if (elementInAllSets) result.add(element);
-    }
-  }
-
-  return result;
-}
-
-function* lazyMap<I, O>(
-  iterable: Iterable<I>,
-  map: (element: I) => O,
-): Generator<O> {
-  for (const element of iterable) {
-    yield map(element);
-  }
-}
-
-// Returns whether all elements of iterable are true, bailing out early if any is false.
-function lazyAll(iterable: Iterable<boolean>): boolean {
-  for (const element of iterable) {
-    if (!element) return false;
-  }
-  return true;
 }
