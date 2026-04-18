@@ -1,3 +1,8 @@
+// Hack: This `reference types="node"` is because we're using Node functions to import
+// test logs from the filesystem. It seems like there should be a less confusing
+// way to do this, but I'm not sure what it is.
+/// <reference types="node" />
+
 import { open } from "node:fs/promises";
 import path from "node:path";
 import { expect, test } from "vitest";
