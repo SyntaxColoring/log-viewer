@@ -18,10 +18,17 @@ const YIELD_INTERVAL = 1000 / 60;
 export interface LogSearcher {
   /** The total number of entries in the log file. */
   entryCount: number;
+
+  /**
+   * Searches for entries matching the given filters.
+   * Returns the matching entry numbers.
+   */
   search: (
     params: SearchParams,
     abortSignal?: AbortSignal,
-  ) => Promise<ResultSet>;
+  ) => Promise<number[]>;
+
+  /** Returns the full contents of the given entries. */
   getEntries: (entryNumbers: number[]) => Promise<LogEntry[]>;
 }
 
@@ -32,18 +39,6 @@ export interface SearchParams {
    */
   substring: string | null;
   // TODO: Also allow filtering by unit, priority, etc.
-}
-
-export interface ResultSet {
-  /** The number of entries in this result set. */
-  entryCount: number;
-  /**
-   * A mapping from result-set index -> underlying log-file entry index.
-   * This is exposed synchronously so it can be used for React keys.
-   */
-  entryNumbers: number[];
-  /** Get a range of entries [start, end) from this result set. */
-  getEntries: (start: number, end: number) => Promise<LogEntry[]>;
 }
 
 interface ByteRange {
@@ -119,23 +114,10 @@ export async function buildLogSearcher(
   const search = async (
     params: SearchParams,
     abortSignal?: AbortSignal,
-  ): Promise<ResultSet> => {
+  ): Promise<number[]> => {
     if (params.substring === null) {
-      const allEntryNumbers = Array(byteRanges.length)
-        .fill(0)
-        .map((_, i) => i);
-      return {
-        entryCount: byteRanges.length,
-        entryNumbers: allEntryNumbers,
-        getEntries: async (start, end) => {
-          const results: LogEntry[] = [];
-          for (let i = start; i < end; i++) {
-            const entry = await getEntry(i);
-            results.push(entry);
-          }
-          return results;
-        },
-      };
+      const allEntryNumbers = byteRanges.map((_, i) => i);
+      return allEntryNumbers;
     }
 
     // TODO: This call to textSearchIndex.search() can be slow. Run it in a WebWorker.
@@ -159,19 +141,7 @@ export async function buildLogSearcher(
 
     abortSignal?.throwIfAborted();
 
-    return {
-      entryCount: matchingEntryNumbers.length,
-      entryNumbers: matchingEntryNumbers,
-      getEntries: async (start, end) => {
-        const results: LogEntry[] = [];
-        for (let i = start; i < end; i++) {
-          const entryNumber = matchingEntryNumbers[i];
-          const entry = await getEntry(entryNumber);
-          results.push(entry);
-        }
-        return results;
-      },
-    };
+    return matchingEntryNumbers;
   };
 
   return {

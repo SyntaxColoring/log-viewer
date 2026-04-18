@@ -1,5 +1,5 @@
 export { buildLogSearcher } from "./logAccess";
-export type { LogSearcher, ResultSet } from "./logAccess";
+export type { LogSearcher } from "./logAccess";
 
 export { UNDERLYING_RAW_FIELDS } from "./logEntry";
 export type { LogEntry, SyslogPriority } from "./logEntry";

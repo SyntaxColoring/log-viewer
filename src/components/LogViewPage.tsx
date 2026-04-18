@@ -5,7 +5,6 @@ import { Group, Panel } from "react-resizable-panels";
 import {
   type LogEntry,
   type LogSearcher,
-  type ResultSet,
   UNDERLYING_RAW_FIELDS,
 } from "@/backend";
 import { Button } from "@/shadcn/components/ui/button";
@@ -76,7 +75,7 @@ const LOG_VIEW_COLUMNS: LogViewColumn[] = [
 type SearchResultState =
   | { state: "noSearch" }
   | { state: "inProgress" }
-  | { state: "complete"; resultSet: ResultSet };
+  | { state: "complete"; resultEntryNumbers: number[] };
 
 export type LogViewPageProps = {
   searcher: LogSearcher;
@@ -112,13 +111,13 @@ export function LogViewPage({
         : searchResult.state === "inProgress"
         ? { type: "progress" as const }
         : searchResult.state === "complete" &&
-          searchResult.resultSet.entryCount === 0
+          searchResult.resultEntryNumbers.length === 0
         ? { type: "noMatches" as const }
         : {
             type: "matches" as const,
             matchCount:
               searchResult.state === "complete"
-                ? searchResult.resultSet.entryCount
+                ? searchResult.resultEntryNumbers.length
                 : 0,
           },
     onQueryChange: setSearchQuery,
@@ -147,7 +146,7 @@ export function LogViewPage({
           ref={logViewRef}
           entryNumbers={
             searchResult.state === "complete"
-              ? searchResult.resultSet.entryNumbers
+              ? searchResult.resultEntryNumbers
               : []
           }
           selectedEntryNumber={selectedEntryNumber}
@@ -197,7 +196,10 @@ function useSearch(searcher: LogSearcher, query: string): SearchResultState {
           { substring: query === "" ? null : query },
           abortController.signal,
         );
-        setSearchResult({ state: "complete", resultSet: nextResultSet });
+        setSearchResult({
+          state: "complete",
+          resultEntryNumbers: nextResultSet,
+        });
       } catch (exception) {
         if (abortController.signal.aborted) {
           // The exception is probably the abort. Ignore it.
