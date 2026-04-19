@@ -180,3 +180,83 @@ function toRawFields(parsedJSON: unknown): Map<string, string> {
   }
   return result;
 }
+
+if (import.meta.vitest) {
+  const { describe, expect, test } = import.meta.vitest;
+
+  function journalFileFromRecords(records: Record<string, string>[]): File {
+    return new File(
+      [records.map((r) => JSON.stringify(r)).join("\n")],
+      "test.json",
+    );
+  }
+
+  describe("text search", () => {
+    test("empty search", async () => {
+      const records: Record<string, string>[] = [
+        { MESSAGE: "hello" },
+        { MESSAGE: "world" },
+      ];
+      const searcher = await buildLogSearcher(journalFileFromRecords(records));
+      expect(await searcher.search({ substring: null })).toStrictEqual([0, 1]);
+      expect(await searcher.search({ substring: "" })).toStrictEqual([0, 1]);
+    });
+    test("shorter search (not triggering the n-gram code path)", async () => {
+      const records: Record<string, string>[] = [
+        { MESSAGE: "hello" },
+        { MESSAGE: "world" },
+        { MESSAGE: "and" },
+        { MESSAGE: "goodbye" },
+        { MESSAGE: "world" },
+      ];
+      const searcher = await buildLogSearcher(journalFileFromRecords(records));
+      expect(
+        await searcher.search({
+          substring: "o",
+        }),
+      ).toStrictEqual([0, 1, 3, 4]);
+      expect(
+        await searcher.search({
+          substring: "O",
+        }),
+      ).toStrictEqual([0, 1, 3, 4]);
+      expect(
+        await searcher.search({
+          substring: "d",
+        }),
+      ).toStrictEqual([1, 2, 3, 4]);
+      expect(
+        await searcher.search({
+          substring: "D",
+        }),
+      ).toStrictEqual([1, 2, 3, 4]);
+    });
+    test("longer search (triggering the n-gram code path)", async () => {
+      const records: Record<string, string>[] = [
+        { MESSAGE: "sphinx of black quartz, judge my vow." },
+        { MESSAGE: "jackdaws love my big sphinx of quartz." },
+      ];
+      const searcher = await buildLogSearcher(journalFileFromRecords(records));
+      expect(
+        await searcher.search({
+          substring: "sphinx",
+        }),
+      ).toStrictEqual([0, 1]);
+      expect(
+        await searcher.search({
+          substring: "SPHINX",
+        }),
+      ).toStrictEqual([0, 1]);
+      expect(
+        await searcher.search({
+          substring: "love",
+        }),
+      ).toStrictEqual([1]);
+      expect(
+        await searcher.search({
+          substring: "LOVE",
+        }),
+      ).toStrictEqual([1]);
+    });
+  });
+}
