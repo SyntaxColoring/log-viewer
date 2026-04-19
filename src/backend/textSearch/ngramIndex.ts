@@ -55,7 +55,7 @@ function intersect<T>(sets: Set<T>[]): Set<T> {
   if (sets.length > 0) {
     // Optimization: query the sets with fewest elements first,
     // assuming they're most likely to be missing elements from other sets.
-    const sortedSets = sets.slice().sort((s) => s.size);
+    const sortedSets = sets.slice().sort((a, b) => a.size - b.size);
     const firstSet = sortedSets[0];
     const otherSets = sortedSets.slice(1);
 
