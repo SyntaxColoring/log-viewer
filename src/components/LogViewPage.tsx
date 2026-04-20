@@ -131,9 +131,13 @@ export function LogViewPage({
             type="button"
             variant="ghost"
             size="icon"
-            aria-label="Clear file and return to home page"
-            title="Clear file and return to home page"
-            onClick={onReturnHome}
+            aria-label="Clear current file"
+            title="Clear current file"
+            onClick={() => {
+              if (confirm("Clear the current file?")) {
+                onReturnHome();
+              }
+            }}
           >
             <X className="size-4" />
           </Button>
