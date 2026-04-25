@@ -25,6 +25,9 @@ export default defineConfig([
         projectService: true,
       },
     },
+    rules: {
+      "@typescript-eslint/require-array-sort-compare": "error",
+    },
   },
   {
     files: ["src/shadcn/components/ui/**/*.{ts,tsx}"],
