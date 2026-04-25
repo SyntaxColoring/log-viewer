@@ -25,5 +25,6 @@ export default defineConfig({
   },
   test: {
     includeSource: ["src/**/*.{js,ts,tsx}"],
+    silent: "passed-only",
   },
 });
