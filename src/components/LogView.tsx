@@ -9,6 +9,7 @@ import {
 import clsx from "clsx";
 import {
   useCallback,
+  useEffect,
   useImperativeHandle,
   useRef,
   useState,
@@ -30,7 +31,16 @@ const CONSUME_GRID_TEMPLATE_COLUMNS: CSSProperties = {
   gridTemplateColumns: `var(${GRID_TEMPLATE_COLUMNS_VAR})`,
 };
 
-const VIRTUOSO_OVERSCAN = 1000;
+/**
+ * How many rows beyond the currently-visible range we eagerly load and keep cached.
+ */
+const PRELOAD_DISTANCE = 200;
+
+/**
+ * When the visible range comes within this many rows of either edge of the
+ * currently-cached range, trigger a new load to extend the cache.
+ */
+const TRIGGER_DISTANCE = 50;
 
 const DEFAULT_COLUMN_WIDTH = 100;
 const MIN_COLUMN_WIDTH = 20;
@@ -211,14 +221,18 @@ function Body(props: BodyProps): JSX.Element {
     [entryNumbers, selectedEntryNumber],
   );
 
+  const { getEntry, setVisibleVirtualizedRange } = useBatchedEntryLoader(
+    logSearcher,
+    entryNumbers,
+  );
+
   const renderItemContent = useCallback(
     (virtualizedIndex: number) => {
       const entryNumber = entryNumbers[virtualizedIndex];
       return (
         <EntryRow
           rowIndex={virtualizedIndex}
-          entryNumber={entryNumber}
-          logSearcher={logSearcher}
+          entry={getEntry(virtualizedIndex)}
           columns={columns}
           query={query}
           isSelected={selectedVirtualizedIndex === virtualizedIndex}
@@ -229,11 +243,26 @@ function Body(props: BodyProps): JSX.Element {
     [
       columns,
       entryNumbers,
-      logSearcher,
+      getEntry,
       onSelectedEntryNumberChange,
       query,
       selectedVirtualizedIndex,
     ],
+  );
+
+  const handleItemsRendered = useCallback(
+    (items: ListItem<unknown>[]) => {
+      itemsRenderedRef.current = items;
+      if (items.length === 0) {
+        setVisibleVirtualizedRange(null);
+      } else {
+        setVisibleVirtualizedRange({
+          firstVirtualizedIndex: items[0].index,
+          lastVirtualizedIndex: items[items.length - 1].index,
+        });
+      }
+    },
+    [setVisibleVirtualizedRange],
   );
 
   function handleKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {
@@ -273,10 +302,9 @@ function Body(props: BodyProps): JSX.Element {
           virtuosoScrollerRef.current = scroller;
         }}
         totalCount={entryNumbers.length}
-        overscan={{ main: VIRTUOSO_OVERSCAN, reverse: VIRTUOSO_OVERSCAN }}
         computeItemKey={(virtualizedIndex) => entryNumbers[virtualizedIndex]}
         itemContent={renderItemContent}
-        itemsRendered={(items) => (itemsRenderedRef.current = items)}
+        itemsRendered={handleItemsRendered}
         /* Virtuoso adds a tab-stop by default ({0}). Disable that, since we add our own. */
         tabIndex={-1}
       />
@@ -295,8 +323,7 @@ interface LoadedEntryProps {
 
 interface EntryRowProps {
   rowIndex: number;
-  entryNumber: number;
-  logSearcher: LogSearcher;
+  entry: LogEntry | null;
   columns: LogViewColumn[];
   query: string | null;
   isSelected: boolean;
@@ -304,16 +331,7 @@ interface EntryRowProps {
 }
 
 function EntryRow(props: EntryRowProps): JSX.Element {
-  const {
-    rowIndex,
-    entryNumber,
-    logSearcher,
-    columns,
-    query,
-    isSelected,
-    onClick,
-  } = props;
-  const entry = useLoadEntry(logSearcher, entryNumber);
+  const { rowIndex, entry, columns, query, isSelected, onClick } = props;
   if (entry === null) {
     return <UnloadedEntry isSelected={isSelected} onClick={onClick} />;
   }
@@ -383,29 +401,243 @@ function UnloadedEntry(props: UnloadedEntryProps): JSX.Element {
   );
 }
 
-function useLoadEntry(
+interface VirtualizedRange {
+  firstVirtualizedIndex: number;
+  lastVirtualizedIndex: number;
+}
+
+interface UseBatchedEntryLoaderResult {
+  /** Returns the loaded `LogEntry` for the given virtualized index, or `null` if not yet loaded. */
+  getEntry: (virtualizedIndex: number) => LogEntry | null;
+  /**
+   * Should be called whenever the set of currently-rendered rows changes.
+   * Drives both eager preloading and cache trimming.
+   */
+  setVisibleVirtualizedRange: (range: VirtualizedRange | null) => void;
+}
+
+/**
+ * Loads `LogEntry`s in batches around the currently-visible row range.
+ *
+ * Batching: when the visible range comes within {@link TRIGGER_DISTANCE} rows
+ * of the cached range's edge, we issue a single batched request that covers
+ * the visible range plus {@link PRELOAD_DISTANCE} rows on each side. Anything
+ * outside that window is discarded from the cache.
+ *
+ * Throttling: at most one request is in flight at a time. If the visible
+ * range moves while a request is in flight, we remember the latest desired
+ * range and issue a follow-up request as soon as the in-flight one settles.
+ * This guarantees the cache eventually catches up to the current position
+ * even after fast scrolling. Later queries clobber earlier ones (when an
+ * in-flight load returns and its data is no longer near the visible range,
+ * we keep none of it and immediately dispatch a fresh load).
+ *
+ * Race-safety: when the inputs (`logSearcher` or `entryNumbers`) change, the
+ * cache is cleared synchronously during render so that stale data from a
+ * previous filter set is never displayed. In-flight results from before the
+ * change are discarded by comparing against the latest tracked inputs.
+ */
+function useBatchedEntryLoader(
   logSearcher: LogSearcher,
-  entryNumber: number,
-): LogEntry | null {
-  const [loadedEntry, setLoadedEntry] = React.useState<LogEntry | null>(null);
+  entryNumbers: number[],
+): UseBatchedEntryLoaderResult {
+  const [cache, setCache] = useState<Map<number, LogEntry>>(() => new Map());
 
-  React.useEffect(() => {
-    let ignore = false;
-    // I know of no better way to do this.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setLoadedEntry(null);
-    const load = async () => {
-      const entries = await logSearcher.getEntries([entryNumber]);
-      if (!ignore) setLoadedEntry(entries[0]);
-    };
-    // eslint-disable-next-line @typescript-eslint/no-floating-promises
-    load();
+  // The loader is held in React state (rather than a ref) so we can detect
+  // input changes during render and synchronously swap it out. This is
+  // critical for race-safety: it ensures that an in-flight load from the
+  // previous inputs cannot commit stale data into `cache` after the inputs
+  // change. We dispose the old loader inline (just toggling a boolean flag,
+  // no side effects) so that any pending async resolution becomes a no-op.
+  const [loader, setLoader] = useState<BatchedEntryLoader>(
+    () => new BatchedEntryLoader(logSearcher, entryNumbers, setCache),
+  );
+  if (
+    loader.logSearcher !== logSearcher ||
+    loader.entryNumbers !== entryNumbers
+  ) {
+    loader.dispose();
+    setLoader(new BatchedEntryLoader(logSearcher, entryNumbers, setCache));
+    setCache(new Map());
+  }
+
+  // Dispose the loader on unmount so any pending async won't try to setState
+  // after the component is gone. (Disposal on input change is handled above.)
+  useEffect(() => {
     return () => {
-      ignore = true;
+      loader.dispose();
     };
-  }, [logSearcher, entryNumber]);
+  }, [loader]);
 
-  return loadedEntry;
+  const setVisibleVirtualizedRange = useCallback(
+    (range: VirtualizedRange | null) => {
+      loader.setVisibleRange(range);
+    },
+    [loader],
+  );
+
+  const getEntry = useCallback(
+    (virtualizedIndex: number) => cache.get(virtualizedIndex) ?? null,
+    [cache],
+  );
+
+  return { getEntry, setVisibleVirtualizedRange };
+}
+
+/**
+ * Imperative state machine for batched, throttled, race-safe entry loading.
+ * Owned by {@link useBatchedEntryLoader}; instantiated fresh whenever the
+ * `LogSearcher` or `entryNumbers` change so that earlier loads are
+ * effectively canceled.
+ */
+class BatchedEntryLoader {
+  readonly logSearcher: LogSearcher;
+  readonly entryNumbers: number[];
+  private readonly setCache: (cache: Map<number, LogEntry>) => void;
+  private visibleRange: VirtualizedRange | null = null;
+  private cachedRange: VirtualizedRange | null = null;
+  private inFlight = false;
+  private disposed = false;
+
+  constructor(
+    logSearcher: LogSearcher,
+    entryNumbers: number[],
+    setCache: (cache: Map<number, LogEntry>) => void,
+  ) {
+    this.logSearcher = logSearcher;
+    this.entryNumbers = entryNumbers;
+    this.setCache = setCache;
+  }
+
+  dispose(): void {
+    this.disposed = true;
+  }
+
+  setVisibleRange(range: VirtualizedRange | null): void {
+    this.visibleRange = range;
+    this.maybeStartLoad();
+  }
+
+  private maybeStartLoad(): void {
+    if (this.disposed) return;
+    if (this.inFlight) return;
+    const visible = this.visibleRange;
+    if (visible === null) return;
+    if (this.entryNumbers.length === 0) return;
+
+    const cached = this.cachedRange;
+    const needsLoad =
+      cached === null ||
+      visible.firstVirtualizedIndex - cached.firstVirtualizedIndex <
+        TRIGGER_DISTANCE ||
+      cached.lastVirtualizedIndex - visible.lastVirtualizedIndex <
+        TRIGGER_DISTANCE ||
+      // The visible range escaped the cache entirely (e.g. fast scroll).
+      visible.lastVirtualizedIndex < cached.firstVirtualizedIndex ||
+      visible.firstVirtualizedIndex > cached.lastVirtualizedIndex;
+    if (!needsLoad) return;
+
+    const desired = clampRange(
+      {
+        firstVirtualizedIndex: visible.firstVirtualizedIndex - PRELOAD_DISTANCE,
+        lastVirtualizedIndex: visible.lastVirtualizedIndex + PRELOAD_DISTANCE,
+      },
+      0,
+      this.entryNumbers.length - 1,
+    );
+
+    const indicesToLoad: number[] = [];
+    const entryNumbersToLoad: number[] = [];
+    for (
+      let i = desired.firstVirtualizedIndex;
+      i <= desired.lastVirtualizedIndex;
+      i++
+    ) {
+      indicesToLoad.push(i);
+      entryNumbersToLoad.push(this.entryNumbers[i]);
+    }
+
+    this.inFlight = true;
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
+    (async () => {
+      let loadedEntries: LogEntry[] | null = null;
+      try {
+        loadedEntries = await this.logSearcher.getEntries(entryNumbersToLoad);
+      } finally {
+        this.inFlight = false;
+      }
+
+      if (this.disposed || loadedEntries === null) {
+        return;
+      }
+
+      // The visible range may have shifted while we were loading. Trim the
+      // accepted entries to {@link PRELOAD_DISTANCE} of the *current* visible
+      // range so we don't retain far-away stale data. If the visible range
+      // moved entirely outside `desired` (a fast scroll), we keep none of
+      // these entries; the recursive `maybeStartLoad()` below will then fire
+      // a fresh request for the new position. This is what implements
+      // "later queries clobber earlier ones".
+      const currentVisible = this.visibleRange;
+      const trimRange =
+        currentVisible === null
+          ? null
+          : clampRange(
+              {
+                firstVirtualizedIndex:
+                  currentVisible.firstVirtualizedIndex - PRELOAD_DISTANCE,
+                lastVirtualizedIndex:
+                  currentVisible.lastVirtualizedIndex + PRELOAD_DISTANCE,
+              },
+              0,
+              this.entryNumbers.length - 1,
+            );
+
+      const newCache = new Map<number, LogEntry>();
+      let firstAccepted = Infinity;
+      let lastAccepted = -Infinity;
+      if (trimRange !== null) {
+        for (let i = 0; i < indicesToLoad.length; i++) {
+          const virtualizedIndex = indicesToLoad[i];
+          if (
+            virtualizedIndex >= trimRange.firstVirtualizedIndex &&
+            virtualizedIndex <= trimRange.lastVirtualizedIndex
+          ) {
+            newCache.set(virtualizedIndex, loadedEntries[i]);
+            if (virtualizedIndex < firstAccepted)
+              firstAccepted = virtualizedIndex;
+            if (virtualizedIndex > lastAccepted)
+              lastAccepted = virtualizedIndex;
+          }
+        }
+      }
+
+      this.cachedRange =
+        newCache.size === 0
+          ? null
+          : {
+              firstVirtualizedIndex: firstAccepted,
+              lastVirtualizedIndex: lastAccepted,
+            };
+      this.setCache(newCache);
+
+      // Always re-evaluate after a load settles. Even if we kept nothing,
+      // this gets the next request started so the cache catches up to the
+      // current scroll position.
+      this.maybeStartLoad();
+    })();
+  }
+}
+
+function clampRange(
+  range: VirtualizedRange,
+  min: number,
+  max: number,
+): VirtualizedRange {
+  return {
+    firstVirtualizedIndex: clamp(range.firstVirtualizedIndex, min, max),
+    lastVirtualizedIndex: clamp(range.lastVirtualizedIndex, min, max),
+  };
 }
 
 function BodyCell(
