@@ -1,10 +1,11 @@
+import { PostingList } from "../postingList";
 import { intersect } from "../setUtils";
 import { extractNgrams } from "./extractNgrams";
 
 export class NgramIndex {
   // Keys are n-gram strings.
   // Values are the document IDs (log entry numbers) containing that n-gram.
-  private readonly index: Map<string, Set<number>>;
+  private readonly index: Map<string, PostingList>;
 
   private readonly n: number;
 
@@ -30,7 +31,7 @@ export class NgramIndex {
     const uniqueSearchNgrams = [...new Set(extractNgrams(searchText, this.n))];
     if (uniqueSearchNgrams.length > 0) {
       const containingDocumentsPerNgram = uniqueSearchNgrams.map(
-        (ngram) => this.index.get(ngram) ?? new Set<number>(),
+        (ngram) => new Set(this.index.get(ngram) ?? []),
       );
       const documentsContainingAllNgrams = intersect(
         containingDocumentsPerNgram,
@@ -42,8 +43,13 @@ export class NgramIndex {
   }
 
   private registerNgram(ngram: string, documentID: number): void {
-    const existingSet = this.index.get(ngram);
-    if (existingSet === undefined) this.index.set(ngram, new Set([documentID]));
-    else existingSet.add(documentID);
+    const existingPostingList = this.index.get(ngram);
+    if (existingPostingList === undefined) {
+      const postingList = new PostingList();
+      postingList.appendEntryNumber(documentID);
+      this.index.set(ngram, postingList);
+    } else {
+      existingPostingList.appendEntryNumber(documentID);
+    }
   }
 }
