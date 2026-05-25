@@ -63,7 +63,7 @@ export async function buildLogSearcher(
 ): Promise<LogSearcher> {
   const byteRanges: ByteRange[] = [];
 
-  const ngramIndex = new NgramIndex<number>(3);
+  const ngramIndex = new NgramIndex(3);
   const priorityIndex = new FieldValueIndex();
   const unitIndex = new FieldValueIndex();
   const syslogIdentifierIndex = new FieldValueIndex();
